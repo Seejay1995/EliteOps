@@ -283,6 +283,63 @@
     <main>
       <section class="view active" id="view-route">
         <h2>Route &amp; Cargo</h2>
+        <div class="sw-toolbar" style="margin-bottom:.6rem">
+          <button class="btn rmode" data-rmode="trade">Trade</button>
+          <button class="btn ghost rmode" data-rmode="exped">Expedition</button>
+          <button class="btn ghost rmode" data-rmode="plot">Plot</button>
+        </div>
+
+        <!-- ============ PLOT: build an expedition from a route source ============ -->
+        <div id="rm-plot" style="display:none">
+          <div class="card">
+            <div class="sw-toolbar" style="margin:0 0 .5rem">
+              <select id="pKind">
+                <option value="neutron">Neutron highway (A → B)</option>
+                <option value="riches">Road to Riches (value circuit)</option>
+                <option value="tourist">Tourist (multi-stop, auto-ordered)</option>
+                <option value="manual">Manual system list</option>
+              </select>
+              <button class="btn ghost" id="pFromExo">Use Exo route</button>
+            </div>
+            <div class="cargo-form">
+              <div class="field p-f p-neutron p-riches p-tourist"><label>From system</label><input id="p-from" type="text" placeholder="current"></div>
+              <div class="field p-f p-neutron p-riches p-tourist"><label>Jump range (ly)</label><input id="p-range" type="number" min="1" step="0.1"></div>
+              <div class="field p-f p-neutron"><label>To system</label><input id="p-to" type="text" placeholder="destination"></div>
+              <div class="field p-f p-neutron"><label>Efficiency %</label><input id="p-eff" type="number" min="1" max="100" value="60"></div>
+              <div class="field p-f p-riches"><label>Radius (ly)</label><input id="p-radius" type="number" min="10" value="200"></div>
+              <div class="field p-f p-riches"><label>Max systems</label><input id="p-max" type="number" min="1" max="50" value="20"></div>
+              <div class="field p-f p-riches"><label>Min value (cr)</label><input id="p-minval" type="number" min="0" step="50000" value="300000"></div>
+              <label class="toggle p-f p-riches"><input id="p-loop" type="checkbox"> Loop back</label>
+              <div class="field p-f p-name"><label>Expedition name <small class="muted">(optional)</small></label><input id="p-name" type="text" placeholder="auto"></div>
+            </div>
+            <textarea id="p-list" class="sw-import" style="display:none;min-height:5rem" placeholder="One system per line. Optional note after | or —  e.g.  Maia | pick up cargo"></textarea>
+            <div class="sw-toolbar" style="margin-top:.5rem">
+              <button class="btn" id="pGo">Make expedition</button>
+              <span class="muted" id="pStatus" style="font-size:.82rem"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ EXPEDITION: the mission checklist ============ -->
+        <div id="rm-exped" style="display:none">
+          <div id="expBanner" class="banner none">No expedition yet — use <b>Plot</b> to make one.</div>
+          <div class="card" id="expHeadCard" style="display:none">
+            <div class="sw-toolbar" style="margin:0">
+              <input id="expName" type="text" placeholder="expedition name" style="flex:1;min-width:9rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.45rem;font-family:inherit">
+              <select id="expSaved" title="saved expeditions"><option value="">— saved —</option></select>
+              <button class="btn ghost" id="expLoad" style="padding:.4rem .7rem">Load</button>
+              <button class="btn" id="expSave" style="padding:.4rem .8rem">Save</button>
+              <button class="btn ghost" id="expDelete" style="padding:.4rem .7rem">Delete</button>
+              <button class="btn ghost" id="expReset" style="padding:.4rem .7rem">Clear</button>
+            </div>
+            <div class="var-bar" style="margin-top:.6rem"><div id="expFill" class="var-fill" style="width:0%"></div></div>
+            <div class="matbar" id="expStats" style="margin-top:.5rem"></div>
+          </div>
+          <div id="expWaypoints"></div>
+        </div>
+
+        <!-- ============ TRADE (existing) ============ -->
+        <div id="rm-trade">
         <div class="card">
           <div class="cargo-form">
             <div class="field"><label>From system</label><input id="f-system" type="text" placeholder="current"></div>
@@ -301,6 +358,7 @@
         </div>
         <div class="cargo-status" id="cargoStatus"></div>
         <div id="cargoResult"></div>
+        </div><!-- /rm-trade -->
       </section>
       <section class="view" id="view-nav">
         <h2>Navigation Assistant</h2>
@@ -1262,6 +1320,133 @@ async function guardianTick(){
     `<div class="act"><span class="txt muted" style="font-size:.8rem">${esc(s.note)}</span></div></div>`).join('');
 }
 
+/* ---- Route tab modes: Trade | Expedition | Plot ---- */
+function setRouteMode(m){
+  document.querySelectorAll('.rmode').forEach(b=>{
+    const on=b.dataset.rmode===m; b.classList.toggle('ghost',!on); b.classList.toggle('active',on);
+  });
+  ['trade','exped','plot'].forEach(k=>{ const el=$('rm-'+k); if(el) el.style.display = (k===m)?'block':'none'; });
+  if(m==='exped') expTick();
+  if(m==='plot') prefillPlot();
+}
+document.querySelectorAll('.rmode').forEach(b=>b.addEventListener('click',()=>setRouteMode(b.dataset.rmode)));
+
+/* ---- Plot: build an expedition from a route source ---- */
+function plotKind(){ return $('pKind').value; }
+function syncPlotFields(){
+  const k=plotKind();
+  document.querySelectorAll('.p-f').forEach(el=>{
+    el.style.display = (el.classList.contains('p-'+k) || el.classList.contains('p-name')) ? '' : 'none';
+  });
+  $('p-list').style.display = (k==='tourist'||k==='manual') ? 'block' : 'none';
+  $('p-list').placeholder = k==='tourist'
+    ? 'Destinations — one system per line (order is optimised for you)'
+    : 'One system per line. Optional note after | or —  e.g.  Maia | pick up cargo';
+}
+$('pKind').addEventListener('change', syncPlotFields);
+async function prefillPlot(){
+  try{
+    const p=await jget('/api/cargo/prefill');
+    if(!$('p-from').value) $('p-from').value = p.system||'';
+    if(!$('p-range').value && p.jump_range) $('p-range').value = p.jump_range;
+  }catch(e){}
+  syncPlotFields();
+}
+$('pFromExo').addEventListener('click', async()=>{
+  $('pStatus').textContent='◷ importing exo route…';
+  const r=await fetch('/api/expedition/from-exo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:$('p-name').value})});
+  const d=await r.json();
+  $('pStatus').textContent = r.ok ? '' : ('⚠ '+(d.error||'failed'));
+  if(r.ok){ setRouteMode('exped'); expTick(); }
+});
+$('pGo').addEventListener('click', async()=>{
+  const k=plotKind(), name=$('p-name').value;
+  $('pStatus').textContent='◷ plotting…';
+  try{
+    if(k==='manual'){
+      const r=await fetch('/api/expedition/from-systems',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:$('p-list').value,name})});
+      if(!r.ok){ $('pStatus').textContent='⚠ '+((await r.json()).error||'failed'); return; }
+      $('pStatus').textContent=''; setRouteMode('exped'); expTick(); return;
+    }
+    const params={name, from_system:$('p-from').value, jump_range:parseFloat($('p-range').value)||50};
+    if(k==='neutron'){ params.to_system=$('p-to').value; params.efficiency=parseInt($('p-eff').value)||60; }
+    if(k==='riches'){ params.radius=parseFloat($('p-radius').value)||200; params.max_results=parseInt($('p-max').value)||20;
+                      params.min_value=parseInt($('p-minval').value)||300000; params.loop=$('p-loop').checked; }
+    if(k==='tourist'){ params.destinations=$('p-list').value; }
+    await fetch('/api/expedition/plot',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:k,params})});
+    for(let i=0;i<90;i++){
+      await new Promise(r=>setTimeout(r,1000));
+      const d=await jget('/api/expedition');
+      if(d.status==='error'){ $('pStatus').textContent='⚠ '+d.error; return; }
+      if(d.status==='ready' && d.waypoints.length){ $('pStatus').textContent=''; setRouteMode('exped'); expTick(); return; }
+    }
+    $('pStatus').textContent='⚠ timed out — Spansh took too long.';
+  }catch(e){ $('pStatus').textContent='⚠ '+e.message; }
+});
+
+/* ---- Expedition: the mission checklist ---- */
+window.expGoto = async i => { await fetch('/api/expedition/goto',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}); expTick(); };
+window.expSkip = async i => { await fetch('/api/expedition/skip',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:i})}); expTick(); };
+window.expObj  = async (w,o) => { await fetch('/api/expedition/objective',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({wp:w,obj:o})}); expTick(); };
+window.expCopy = async s => { await fetch('/api/expedition/copy',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({system:s})}); };
+async function expAct(action, payload){
+  const r=await fetch('/api/expedition/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
+  expTick(); return r;
+}
+$('expSave').addEventListener('click', ()=>expAct('save',{name:$('expName').value||undefined}));
+$('expLoad').addEventListener('click', ()=>{ const s=$('expSaved').value; if(s) expAct('load',{slug:s}); });
+$('expDelete').addEventListener('click', ()=>{ const s=$('expSaved').value; if(s && confirm('Delete saved expedition?')) expAct('delete',{slug:s}); });
+$('expReset').addEventListener('click', ()=>{ if(confirm('Clear the current expedition?')) expAct('reset',{}); });
+$('expName').addEventListener('change', ()=>expAct('rename',{name:$('expName').value}));
+
+let _expNameFocus=false;
+$('expName').addEventListener('focus',()=>_expNameFocus=true);
+$('expName').addEventListener('blur',()=>_expNameFocus=false);
+
+async function expTick(){
+  let d; try{ d=await jget('/api/expedition'); }catch(e){ return; }
+  const sel=$('expSaved'), cur=sel.value;
+  sel.innerHTML='<option value="">— saved —</option>'+(d.saved||[]).map(s=>`<option value="${esc(s.slug)}">${esc(s.name)} (${s.waypoints})</option>`).join('');
+  if((d.saved||[]).some(s=>s.slug===cur)) sel.value=cur;
+
+  const has=d.waypoints && d.waypoints.length;
+  $('expHeadCard').style.display = has?'block':'none';
+  const b=$('expBanner');
+  if(d.status==='plotting'){ b.className='banner some'; b.innerHTML='◷ Plotting…'; return; }
+  if(!has){ b.className='banner none'; b.innerHTML='No expedition yet — use <b>Plot</b> to make one, or import the Exo tab\'s route.'; $('expWaypoints').innerHTML=''; return; }
+
+  const p=d.progress;
+  b.className = p.pct>=100 ? 'banner undisc' : 'banner some';
+  b.innerHTML = `${esc(d.name)}<small>${esc(d.note||'')}${d.next_system?` · next: <b>${esc(d.next_system)}</b>`:''}</small>`;
+  if(!_expNameFocus) $('expName').value = d.name||'';
+  $('expFill').style.width = p.pct+'%';
+  $('expStats').innerHTML =
+    `<span class="matchip">waypoints <b>${p.waypoints_done}</b>/${p.waypoints_total}</span>`+
+    `<span class="matchip">objectives <b>${p.objectives_done}</b>/${p.objectives_total}</span>`+
+    `<span class="matchip"><b>${p.pct}%</b> done</span>`+
+    (p.value?`<span class="matchip">~<b>${cr(p.value)}</b> cr</span>`:'')+
+    (p.distance_left?`<span class="matchip"><b>${Math.round(p.distance_left).toLocaleString()}</b> ly left</span>`:'');
+
+  $('expWaypoints').innerHTML = '<div class="stops">'+d.waypoints.map(w=>{
+    const cls = w.current?'cur':(w.complete||w.skipped?'done':'');
+    const objs = w.objectives.map((o,oi)=>{
+      const mk = o.done?'<span class="mk on">✓</span>':(w.current?'<span class="mk cur">▶</span>':'<span class="mk off">○</span>');
+      const val = o.value?` <span class="muted">(${cr(o.value)} cr)</span>`:'';
+      return `<div class="act" onclick="event.stopPropagation();expObj(${w.n-1},${oi})" style="cursor:pointer">${mk}<span class="txt ${o.done?'done':''}">${esc(o.text)}${val}</span></div>`;
+    }).join('');
+    return `<div class="stop ${cls}" onclick="expGoto(${w.n-1})">`+
+      `<div class="stop-h"><span class="num">${w.n}</span>`+
+      `<span class="place">${esc(w.system)} <small>${w.objectives_done}/${w.objectives_total}${w.meta&&w.meta.jumps?` · ${w.meta.jumps} jumps`:''}</small></span>`+
+      (w.meta&&w.meta.neutron?'<span class="tag" style="color:var(--cyan)">★ neutron</span>':'')+
+      (w.arrived?'<span class="tag" style="color:var(--green)">visited</span>':'')+
+      (w.current?'<span class="tag">HERE</span>':'')+
+      (w.skipped?'<span class="tag">skip</span>':'')+
+      `<button class="copybtn" onclick="event.stopPropagation();expCopy('${esc(w.system)}')">⧉</button>`+
+      `<button class="skipbtn" onclick="event.stopPropagation();expSkip(${w.n-1})">${w.skipped?'unskip':'skip'}</button>`+
+      `</div>${objs}</div>`;
+  }).join('')+'</div>';
+}
+
 /* ---- system scan ---- */
 const sysOpen = new Set();
 window.sysToggleBody = id => { if(sysOpen.has(id)) sysOpen.delete(id); else sysOpen.add(id); systemTick(); };
@@ -1531,6 +1716,7 @@ async function colonyTick(){ try{ renderColony(await jget('/api/colony')); }catc
 
 tick(); setInterval(tick, 1000);
 prefillCargo(); cargoTick(); setInterval(cargoTick, 1200);
+setRouteMode('trade'); expTick(); setInterval(expTick, 2000);
 cgTick(); setInterval(cgTick, 10000);
 colonyTick(); setInterval(colonyTick, 4000);
 firstsTick(); setInterval(firstsTick, 1500);

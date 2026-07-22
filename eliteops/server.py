@@ -24,6 +24,7 @@ from .colony_engine import ColonyEngine
 from .edd_bridge import EddBridge
 from .engmat_engine import EngMatEngine
 from .exo_engine import ExoEngine
+from .expedition_engine import ExpeditionEngine
 from .firsts_engine import FirstsEngine
 from .guardian_engine import GuardianEngine
 from .nav_engine import NavEngine
@@ -43,7 +44,7 @@ class SessionStore:
     Shipwright build, Guardian picks, cash-in threshold) so a server crash/restart
     doesn't lose your work. Journal-derived state rebuilds from the journal replay."""
 
-    _ENGINES = ("cargo", "exo", "shipwright", "guardian", "nav")
+    _ENGINES = ("cargo", "exo", "expedition", "shipwright", "guardian", "nav")
 
     def __init__(self, app: "EliteOps") -> None:
         self.app = app
@@ -90,6 +91,7 @@ class EliteOps:
         self.firsts = FirstsEngine(self.state)
         self.nav = NavEngine(self.state, self.firsts)
         self.exo = ExoEngine(self.state)
+        self.expedition = ExpeditionEngine(self.state, self.exo)
         self.guardian = GuardianEngine(self.state)
         self.engmat = EngMatEngine(self.state)
         self.cg = CGEngine(self.state)
@@ -174,6 +176,9 @@ class EliteOps:
                 if path == "/api/exo/prefill":
                     self._send(200, json.dumps(app.exo.prefill()))
                     return
+                if path == "/api/expedition":
+                    self._send(200, json.dumps(app.expedition.snapshot()))
+                    return
                 if path == "/api/guardian":
                     self._send(200, json.dumps(app.guardian.snapshot()))
                     return
@@ -253,6 +258,43 @@ class EliteOps:
                 if path == "/api/guardian/toggle":
                     app.guardian.toggle(str(body.get("key") or ""))
                     self._send(200, json.dumps(app.guardian.snapshot()))
+                    return
+                if path.startswith("/api/expedition/"):
+                    exp, action = app.expedition, path.rsplit("/", 1)[-1]
+                    try:
+                        if action == "plot":
+                            exp.plot(str(body.get("kind") or "neutron"), body.get("params") or body)
+                        elif action == "from-exo":
+                            exp.use_exo_route(str(body.get("name") or ""))
+                        elif action == "from-systems":
+                            exp.from_systems(str(body.get("text") or ""), str(body.get("name") or ""),
+                                             str(body.get("objective") or ""))
+                        elif action == "goto":
+                            exp.goto(int(body.get("index") or 0))
+                        elif action == "skip":
+                            exp.skip(int(body.get("index") or 0))
+                        elif action == "objective":
+                            exp.toggle_objective(int(body.get("wp") or 0), int(body.get("obj") or 0))
+                        elif action == "copy":
+                            exp.copy_system(str(body.get("system") or ""))
+                        elif action == "rename":
+                            exp.rename(str(body.get("name") or ""))
+                        elif action == "reset":
+                            exp.reset()
+                        elif action == "save":
+                            exp.save(body.get("name"))
+                        elif action == "load":
+                            if not exp.load(str(body.get("slug") or "")):
+                                self._send(404, json.dumps({"error": "expedition not found"}))
+                                return
+                        elif action == "delete":
+                            exp.delete(str(body.get("slug") or ""))
+                        else:
+                            self._send(404, json.dumps({"error": "not found"}))
+                            return
+                        self._send(200, json.dumps(exp.snapshot()))
+                    except Exception as exc:  # noqa: BLE001
+                        self._send(400, json.dumps({"error": str(exc)}))
                     return
                 if path == "/api/guardian/broker":
                     app.guardian.find_broker()

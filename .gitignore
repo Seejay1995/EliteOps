@@ -22,3 +22,5 @@ desktop.ini
 
 # logs
 *.log
+# expeditions (personal saved journeys)
+expeditions/

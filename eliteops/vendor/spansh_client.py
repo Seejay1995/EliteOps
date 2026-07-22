@@ -338,6 +338,122 @@ def exobiology_route(
             "total_value": grand_total}
 
 
+def _post_multi(path: str, pairs: list, timeout: float = 30.0) -> Any:
+    """Like _post but takes a LIST OF TUPLES, so a parameter can repeat (the tourist
+    plotter wants one `destination` per stop)."""
+    data = urllib.parse.urlencode(pairs).encode("utf-8")
+    request = urllib.request.Request(SPANSH_API + path, data=data, headers={"User-Agent": USER_AGENT})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise _http_error(exc) from exc
+    except (urllib.error.URLError, OSError) as exc:
+        raise SpanshError(f"Could not reach Spansh: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise SpanshError("Spansh returned an unreadable response.") from exc
+
+
+def _waypoints_from_jumps(result: Any) -> list[dict[str, Any]]:
+    """Normalise a `system_jumps` payload (neutron + tourist share it)."""
+    out = []
+    for w in (result.get("system_jumps") if isinstance(result, dict) else []) or []:
+        if not isinstance(w, dict):
+            continue
+        out.append({
+            "system": w.get("system"), "id64": w.get("id64"),
+            "jumps": w.get("jumps"),
+            "neutron": bool(w.get("neutron_star")),
+            "distance_jumped": w.get("distance_jumped"),
+            "distance_left": w.get("distance_left"),
+            "x": w.get("x"), "y": w.get("y"), "z": w.get("z"),
+        })
+    return out
+
+
+def neutron_route(*, from_system: str, to_system: str, jump_range: float,
+                  efficiency: int = 60, poll_timeout: float = 180.0,
+                  on_progress: "ProgressCallback | None" = None) -> dict[str, Any]:
+    """Neutron-highway plot A->B. NOTE this endpoint takes `from`/`to`."""
+    if not str(from_system).strip() or not str(to_system).strip():
+        raise SpanshError("Both a start and a destination system are required.")
+    result = _await_job(
+        _post("/route", {"from": str(from_system).strip(), "to": str(to_system).strip(),
+                         "range": jump_range, "efficiency": efficiency}),
+        poll_timeout=poll_timeout, on_progress=on_progress)
+    waypoints = _waypoints_from_jumps(result)
+    if not waypoints:
+        raise SpanshError("Spansh could not plot a route between those systems.")
+    return {"kind": "neutron",
+            "from_system": (result or {}).get("source_system") or from_system,
+            "to_system": (result or {}).get("destination_system") or to_system,
+            "distance": (result or {}).get("distance"),
+            "total_jumps": (result or {}).get("total_jumps"),
+            "waypoints": waypoints}
+
+
+def tourist_route(*, source: str, destinations: list, jump_range: float,
+                  poll_timeout: float = 180.0,
+                  on_progress: "ProgressCallback | None" = None) -> dict[str, Any]:
+    """Multi-stop plot that ORDERS the stops for you. NOTE this endpoint takes
+    `source` + a repeated `destination` (not from/to)."""
+    stops = [str(d).strip() for d in (destinations or []) if str(d).strip()]
+    if not str(source).strip() or not stops:
+        raise SpanshError("A start system and at least one destination are required.")
+    pairs = [("source", str(source).strip()), ("range", str(jump_range))]
+    pairs += [("destination", d) for d in stops]
+    result = _await_job(_post_multi("/tourist/route", pairs),
+                        poll_timeout=poll_timeout, on_progress=on_progress)
+    waypoints = _waypoints_from_jumps(result)
+    if not waypoints:
+        raise SpanshError("Spansh could not plot a route through those systems.")
+    return {"kind": "tourist",
+            "from_system": (result or {}).get("source_system") or source,
+            "destinations": stops, "waypoints": waypoints}
+
+
+def riches_route(*, from_system: str, jump_range: float, radius: float = 100.0,
+                 max_results: int = 25, min_value: int = 500_000,
+                 use_mapping_value: bool = True, loop: bool = False,
+                 poll_timeout: float = 180.0,
+                 on_progress: "ProgressCallback | None" = None) -> dict[str, Any]:
+    """Road to Riches — a circuit of high-value systems with the bodies worth scanning."""
+    if not str(from_system).strip():
+        raise SpanshError("A start system is required.")
+    result = _await_job(
+        _post("/riches/route", {"from": str(from_system).strip(), "range": jump_range,
+                                "radius": radius, "max_results": max_results,
+                                "min_value": min_value,
+                                "use_mapping_value": 1 if use_mapping_value else 0,
+                                "loop": 1 if loop else 0}),
+        poll_timeout=poll_timeout, on_progress=on_progress)
+    systems, grand_total = [], 0
+    for s in result or []:
+        if not isinstance(s, dict):
+            continue
+        bodies = []
+        for b in s.get("bodies") or []:
+            if not isinstance(b, dict):
+                continue
+            val = int(b.get("estimated_mapping_value") or b.get("estimated_scan_value") or 0)
+            bodies.append({"name": b.get("name"), "subtype": b.get("subtype"),
+                           "distance_ls": b.get("distance_to_arrival"),
+                           "scan_value": b.get("estimated_scan_value"),
+                           "mapping_value": b.get("estimated_mapping_value"),
+                           "value": val, "landmark_value": b.get("landmark_value")})
+        if not bodies:
+            continue  # skip the start system / empties
+        sys_total = sum(b["value"] for b in bodies)
+        grand_total += sys_total
+        systems.append({"name": s.get("name"), "id64": s.get("id64"),
+                        "jumps": s.get("jumps"), "total_value": sys_total,
+                        "bodies": sorted(bodies, key=lambda x: -(x["value"] or 0))})
+    if not systems:
+        raise SpanshError("Spansh found no high-value systems for those parameters.")
+    return {"kind": "riches", "from_system": str(from_system).strip(),
+            "systems": systems, "total_value": grand_total}
+
+
 def generate_exobiology(
     *,
     from_system: str,
