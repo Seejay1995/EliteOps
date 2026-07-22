@@ -1,0 +1,24 @@
+# --- local runtime state & secrets -------------------------------------------
+# session/config.json holds your INARA API key; session.json holds live routes.
+session/
+# your own saved ship builds (personal data, not part of the app)
+builds/
+
+# --- python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- os / editor --------------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# logs
+*.log

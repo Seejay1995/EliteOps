@@ -1,0 +1,1546 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EliteOps</title>
+<style>
+  :root{
+    --bg:#0a0b08; --panel:#14150e; --panel2:#1c1d12; --line:#2c2d1c;
+    --orange:#ff7b00; --gold:#ffb000; --dim:#8a8768; --text:#e8e0c0; --green:#57d957; --cyan:#33d6ff;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font-family:Consolas,"SF Mono",ui-monospace,Menlo,monospace;overscroll-behavior:none}
+  body{display:flex;flex-direction:column}
+
+  /* top status bar */
+  header{display:flex;align-items:center;gap:.6rem;padding:.5rem .8rem;background:linear-gradient(180deg,#17180d,#0f100a);
+    border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .logo{font-weight:700;letter-spacing:.12em;color:var(--orange);font-size:1.05rem;margin-right:.4rem}
+  .logo b{color:var(--gold)}
+  .chips{display:flex;gap:.4rem;flex-wrap:wrap;flex:1;min-width:0}
+  .chip{display:flex;gap:.4rem;align-items:baseline;background:var(--panel);border:1px solid var(--line);
+    border-radius:.5rem;padding:.28rem .55rem;white-space:nowrap}
+  .chip .k{color:var(--dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+  .chip .v{color:var(--text);font-weight:600}
+  .chip .v.on{color:var(--green)} .chip .v.off{color:var(--dim)}
+  .live{width:.55rem;height:.55rem;border-radius:50%;background:var(--dim);transition:background .3s}
+  .live.ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+
+  /* layout: side rail + content (wide) -> stacked (narrow) */
+  .body{flex:1;display:grid;grid-template-columns:132px 1fr;min-height:0}
+  nav{display:flex;flex-direction:column;gap:.4rem;padding:.6rem;background:#0e0f09;border-right:1px solid var(--line)}
+  .tab{display:flex;align-items:center;gap:.55rem;padding:.7rem .6rem;border-radius:.6rem;cursor:pointer;
+    color:var(--dim);border:1px solid transparent;font-size:.95rem;user-select:none}
+  .tab .i{font-size:1.15rem;line-height:1}
+  .tab:hover{background:var(--panel)}
+  .tab.active{background:var(--panel2);color:var(--gold);border-color:var(--line);box-shadow:inset 3px 0 0 var(--orange)}
+  main{padding:1rem;overflow:auto;min-height:0}
+  .view{display:none;animation:fade .18s ease} .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h2{margin:.1rem 0 .8rem;color:var(--gold);font-weight:700;letter-spacing:.04em}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:.7rem;padding:1rem;margin-bottom:1rem}
+  .muted{color:var(--dim)}
+  .soon{color:var(--dim);font-style:italic}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.6rem}
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:.6rem;padding:.7rem}
+  .stat .k{color:var(--dim);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em}
+  .stat .v{font-size:1.3rem;color:var(--gold);font-weight:700;margin-top:.2rem}
+
+  /* cargo tool */
+  .cargo-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;align-items:end}
+  .field{display:flex;flex-direction:column;gap:.25rem}
+  .field label{font-size:.68rem;color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+  .field input,.field select{background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:.4rem;padding:.5rem;font-family:inherit;font-size:.9rem;width:100%}
+  .field input:focus,.field select:focus{outline:none;border-color:var(--orange)}
+  .toggle{display:flex;align-items:center;gap:.45rem;cursor:pointer;user-select:none;padding:.55rem 0;font-size:.85rem}
+  .toggle input{width:1.05rem;height:1.05rem;accent-color:var(--orange)}
+  .formbtns{display:flex;gap:.5rem;align-items:end}
+  .btn{background:var(--orange);color:#120a00;border:none;border-radius:.5rem;padding:.62rem 1.1rem;
+    font-weight:700;cursor:pointer;font-family:inherit;font-size:.9rem;white-space:nowrap}
+  .btn.ghost{background:transparent;color:var(--dim);border:1px solid var(--line);font-weight:600}
+  .btn:active{transform:translateY(1px)}
+  .cargo-status{margin:.7rem 0;color:var(--dim);min-height:1.1rem}
+  .cargo-status.err{color:#ff6a5a} .cargo-status.gen{color:var(--gold)}
+  .cargo-status.ok{color:var(--green)}
+
+  .stops{display:flex;flex-direction:column;gap:.5rem;margin:.5rem 0 1rem}
+  .stop{background:var(--panel);border:1px solid var(--line);border-radius:.6rem;padding:.65rem .8rem;
+    cursor:pointer;transition:opacity .2s,border-color .2s}
+  .stop.done{opacity:.45}
+  .stop.cur{border-color:var(--orange);background:var(--panel2);
+    box-shadow:0 0 0 1px var(--orange),0 0 16px rgba(255,123,0,.22)}
+  .stop-h{display:flex;align-items:baseline;gap:.5rem}
+  .stop-h .num{color:var(--gold);font-weight:700;min-width:1.4rem}
+  .stop-h .place{flex:1;font-weight:600}
+  .stop-h .place small{color:var(--dim);font-weight:400}
+  .stop-h .tag{font-size:.68rem;color:var(--orange);border:1px solid var(--line);border-radius:.4rem;padding:.05rem .4rem}
+  .act{display:flex;gap:.5rem;align-items:center;margin-top:.35rem;font-size:.9rem}
+  .act .mk{width:1.4rem;text-align:center;flex-shrink:0}
+  .mk.on{color:var(--green)} .mk.cur{color:var(--orange)} .mk.off{color:var(--dim)}
+  .act .txt.done{color:var(--dim)}
+  .copybtn{margin-left:auto;background:var(--panel2);border:1px solid var(--line);color:var(--gold);
+    border-radius:.4rem;padding:.25rem .65rem;cursor:pointer;font-family:inherit;font-size:.78rem;white-space:nowrap}
+  .copybtn:active{transform:translateY(1px)}
+
+  table.route{width:100%;border-collapse:collapse;margin-top:.3rem;font-size:.84rem}
+  .route th,.route td{text-align:left;padding:.42rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+  .route th{color:var(--dim);text-transform:uppercase;font-size:.66rem;letter-spacing:.05em}
+  .route td.num{color:var(--gold);font-weight:700} .route .profit{color:var(--green);text-align:right}
+  .route td.cargo-cell{white-space:normal}
+  .route tr.skip td{opacity:.4;text-decoration:line-through}
+  .route tr.cur td{background:rgba(255,123,0,.08)}
+  .skipbtn{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:.35rem;
+    padding:.1rem .45rem;cursor:pointer;font-family:inherit;font-size:.72rem}
+  .tblwrap{overflow-x:auto}
+
+  /* firsts radar */
+  .banner{border-radius:.6rem;padding:.8rem 1rem;margin-bottom:.9rem;border:1px solid var(--line);
+    font-weight:700;font-size:1.05rem;background:var(--panel)}
+  .banner.undisc{color:var(--green);border-color:#2f5a2f;box-shadow:0 0 16px rgba(87,217,87,.15)}
+  .banner.some{color:var(--gold)} .banner.none{color:var(--dim)}
+  .banner small{display:block;font-weight:400;font-size:.8rem;color:var(--dim);margin-top:.25rem}
+  .tally{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.9rem}
+  .tchip{background:var(--panel2);border:1px solid var(--line);border-radius:.5rem;padding:.35rem .6rem;font-size:.82rem}
+  .tchip b{color:var(--gold)}
+  table.firsts{width:100%;border-collapse:collapse;font-size:.84rem}
+  .firsts th,.firsts td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+  .firsts th{color:var(--dim);text-transform:uppercase;font-size:.66rem;letter-spacing:.05em}
+  .firsts td.r{text-align:right}
+  .firsts tr.footfall td.body{color:var(--orange);font-weight:700}
+  .firsts tr.discovery td.body{color:var(--gold);font-weight:700}
+  .firsts tr.map td.body{color:var(--cyan);font-weight:700}
+  .firsts tr.none td{color:var(--dim)}
+  .bdg{display:inline-block;border-radius:.35rem;padding:.02rem .35rem;font-size:.68rem;font-weight:700;margin-right:.2rem;border:1px solid currentColor}
+  .bdg.FOOTFALL{color:var(--orange)} .bdg.DISCOVERY{color:var(--gold)}
+  .bdg.MAP{color:var(--cyan)} .bdg.BIO{color:var(--green)}
+  .legend{color:var(--dim);font-size:.75rem;margin-top:.7rem}
+  .legend .d{display:inline-block;width:.6rem;height:.6rem;border-radius:50%;margin:0 .2rem 0 .7rem;vertical-align:middle}
+
+  /* navigate — one clear recommendation */
+  .hero{border-radius:.8rem;padding:1.2rem;border:1px solid var(--line);background:var(--panel);margin-bottom:1rem;
+    border-left:5px solid var(--dim)}
+  .hero.k-CashInDiscoveries{border-left-color:var(--green);box-shadow:0 0 20px rgba(87,217,87,.12)}
+  .hero.k-CompleteFss{border-left-color:var(--cyan)}
+  .hero.k-MapBody{border-left-color:var(--gold)}
+  .hero.k-SkipSystem{border-left-color:var(--orange)}
+  .hero.k-Continue{border-left-color:var(--dim)}
+  .hero .kick{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--dim)}
+  .hero .title{font-size:1.5rem;font-weight:700;color:var(--text);margin:.25rem 0 .4rem;line-height:1.15}
+  .hero.k-CashInDiscoveries .title{color:var(--green)} .hero.k-CompleteFss .title{color:var(--cyan)}
+  .hero.k-MapBody .title{color:var(--gold)} .hero.k-SkipSystem .title{color:var(--orange)}
+  .hero .detail{color:var(--dim);font-size:.95rem}
+  .hero .conf{display:inline-block;margin-top:.6rem;font-size:.7rem;color:var(--dim);border:1px solid var(--line);
+    border-radius:.4rem;padding:.1rem .5rem}
+  .alts{display:flex;flex-direction:column;gap:.4rem}
+  .alt{display:flex;align-items:baseline;gap:.6rem;background:var(--panel);border:1px solid var(--line);
+    border-radius:.5rem;padding:.55rem .7rem}
+  .alt .at{font-weight:600;color:var(--text)} .alt .ad{color:var(--dim);font-size:.85rem;flex:1;min-width:0}
+  .alt .as{color:var(--dim);font-size:.75rem}
+  .var-bar{height:.55rem;border-radius:.4rem;background:var(--panel2);overflow:hidden;margin:.5rem 0}
+  .var-fill{height:100%;background:linear-gradient(90deg,var(--gold),var(--green));transition:width .4s}
+  .var-fill.over{background:linear-gradient(90deg,var(--orange),#ff4a3a)}
+  .thr{display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--dim);margin-top:.4rem}
+  .thr input{width:7rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.3rem .4rem;font-family:inherit}
+  table.nav-t{width:100%;border-collapse:collapse;font-size:.84rem}
+  .nav-t th,.nav-t td{text-align:left;padding:.4rem .5rem;border-bottom:1px solid var(--line);white-space:nowrap}
+  .nav-t th{color:var(--dim);text-transform:uppercase;font-size:.66rem;letter-spacing:.05em}
+  .nav-t td.r{text-align:right}
+  .nav-t .m-yes{color:var(--green)} .nav-t .m-no{color:var(--gold)}
+
+  /* shipwright */
+  .sw-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+  .sw-eyebrow{text-transform:uppercase;letter-spacing:.07em;font-size:.66rem;color:var(--dim);margin-bottom:.35rem}
+  .sw-shipname{font-size:1.2rem;color:var(--gold);font-weight:700}
+  .sw-mods{display:flex;flex-direction:column;gap:.15rem;margin-top:.5rem;max-height:340px;overflow:auto}
+  .sw-mod{display:flex;gap:.5rem;align-items:baseline;padding:.28rem .4rem;border-bottom:1px solid var(--line);font-size:.85rem}
+  .sw-mod .slot{color:var(--dim);min-width:8.5rem;font-size:.75rem}
+  .sw-mod .mn{flex:1;min-width:0}
+  .sw-mod .eb{font-size:.7rem;color:var(--cyan);border:1px solid var(--line);border-radius:.3rem;padding:.02rem .35rem;white-space:nowrap}
+  .sw-mod .eb.exp{color:var(--gold)}
+  .matbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.3rem}
+  .matchip{background:var(--panel2);border:1px solid var(--line);border-radius:.5rem;padding:.3rem .6rem;font-size:.8rem}
+  .matchip b{color:var(--gold)}
+  .g-mods{display:flex;flex-wrap:wrap;gap:.45rem;margin-top:.4rem}
+  .g-mod{border:1px solid var(--line);border-radius:.55rem;padding:.45rem .7rem;cursor:pointer;user-select:none;font-size:.86rem;background:var(--panel2)}
+  .g-mod:hover{border-color:var(--dim)}
+  .g-mod.on{border-color:var(--orange);color:var(--gold);box-shadow:inset 3px 0 0 var(--orange)}
+  .g-mod .grp{color:var(--dim);font-size:.66rem;text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:.1rem}
+  .g-mod .rdy{color:var(--green)}
+  /* material inventory grid */
+  .inv-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.9rem}
+  .inv-col .ceyebrow{text-transform:uppercase;letter-spacing:.06em;font-size:.7rem;color:var(--gold);margin:.2rem 0 .3rem;font-weight:700}
+  .inv-rows{display:flex;flex-direction:column}
+  .inv-row{display:flex;align-items:center;gap:.4rem;padding:.16rem .2rem;font-size:.8rem;border-bottom:1px solid var(--line)}
+  .inv-row.empty{opacity:.38}
+  .inv-g{font-size:.6rem;font-weight:700;border:1px solid currentColor;border-radius:.25rem;padding:0 .22rem;flex-shrink:0}
+  .inv-g.g1{color:#9aa} .inv-g.g2{color:var(--green)} .inv-g.g3{color:var(--cyan)} .inv-g.g4{color:var(--gold)} .inv-g.g5{color:var(--orange)}
+  .inv-row .nm{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .inv-bar{width:2.8rem;height:.4rem;background:var(--bg);border:1px solid var(--line);border-radius:.2rem;overflow:hidden;flex-shrink:0}
+  .inv-bar>div{height:100%}
+  .inv-row .ct{min-width:3.4rem;text-align:right;color:var(--dim);font-size:.72rem;flex-shrink:0}
+  .inv-row.full .ct{color:var(--gold);font-weight:700}
+  .inv-row.high .ct{color:var(--orange)}
+  /* colonization */
+  .pbar{height:.55rem;background:var(--bg);border:1px solid var(--line);border-radius:.3rem;overflow:hidden;flex:1;min-width:5rem}
+  .pbar>div{height:100%;background:linear-gradient(90deg,var(--orange),var(--gold));transition:width .4s}
+  .pbar.done>div{background:var(--green)}
+  .col-res{display:flex;align-items:center;gap:.5rem;padding:.3rem .2rem;border-bottom:1px solid var(--line);font-size:.84rem}
+  .col-res .rn{min-width:9rem}
+  .col-res .rq{color:var(--dim);font-size:.76rem;white-space:nowrap;min-width:8rem;text-align:right}
+  .heatwrap{display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-start}
+  .heatmap{background:radial-gradient(circle at 50% 50%,#0e140f,#0a0b08);border:1px solid var(--line);border-radius:.6rem}
+  .heat-legend{font-size:.72rem;color:var(--dim)}
+  .heat-legend .bar{height:.5rem;width:8rem;border-radius:.3rem;background:linear-gradient(90deg,hsl(200,70%,45%),hsl(120,60%,50%),hsl(45,85%,58%),hsl(25,90%,55%))}
+  /* system scan view */
+  .sys-body{display:flex;align-items:center;gap:.6rem;padding:.4rem .3rem;border-bottom:1px solid var(--line);cursor:pointer}
+  .sys-body:hover{background:var(--panel2)}
+  .sys-disc{width:1.05rem;height:1.05rem;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px rgba(0,0,0,.4)}
+  .sys-body .bn{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .sys-body .bn small{color:var(--dim)}
+  .sys-body .bv{color:var(--green);font-size:.82rem;white-space:nowrap}
+  .sys-body .bd{color:var(--dim);font-size:.76rem;white-space:nowrap}
+  .sys-badges{display:flex;gap:.25rem}
+  .sb{font-size:.62rem;font-weight:700;border-radius:.3rem;padding:.02rem .3rem;border:1px solid currentColor;white-space:nowrap}
+  .sb.map{color:var(--cyan)} .sb.land{color:var(--orange)} .sb.terra{color:var(--green)}
+  .sb.bio{color:var(--green)} .sb.ring{color:var(--gold)} .sb.disc{color:var(--gold)}
+  .sys-detail{font-size:.78rem;color:var(--dim);padding:.3rem .3rem .5rem 2.3rem;border-bottom:1px solid var(--line);display:none}
+  .sys-detail.open{display:block}
+  .sys-detail b{color:var(--text);font-weight:600}
+  /* body-type disc colors */
+  .c-star{background:radial-gradient(circle at 35% 35%,#fff6c0,#ffb000)}
+  .c-whitedwarf{background:radial-gradient(circle at 35% 35%,#fff,#9fd8ff)}
+  .c-compact{background:radial-gradient(circle at 35% 35%,#b0a0ff,#3a2a6a)}
+  .c-elw{background:radial-gradient(circle at 35% 35%,#8fffa8,#1f8f3f)}
+  .c-ww{background:radial-gradient(circle at 35% 35%,#7fd0ff,#1f6fae)}
+  .c-aw{background:radial-gradient(circle at 35% 35%,#ffb0e0,#a03f8f)}
+  .c-gg{background:radial-gradient(circle at 35% 35%,#ffd9a0,#c07a2a)}
+  .c-metalrich{background:radial-gradient(circle at 35% 35%,#ffe9a0,#b8942a)}
+  .c-hmc{background:radial-gradient(circle at 35% 35%,#d8c0a0,#8a6a45)}
+  .c-rocky{background:radial-gradient(circle at 35% 35%,#c8c8c8,#6a6a6a)}
+  .c-icy{background:radial-gradient(circle at 35% 35%,#eaffff,#a0c8d8)}
+  .c-other{background:radial-gradient(circle at 35% 35%,#b0b0b0,#585858)}
+
+  .sw-toolbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem}
+  .sw-toolbar select,.sw-toolbar input{background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:.4rem;padding:.45rem;font-family:inherit;font-size:.85rem}
+  .editor-tbl{width:100%;border-collapse:collapse;font-size:.8rem}
+  .editor-tbl th{color:var(--dim);text-transform:uppercase;font-size:.62rem;letter-spacing:.04em;padding:.35rem .3rem;text-align:left;border-bottom:1px solid var(--line)}
+  .editor-tbl td{padding:.25rem .3rem;border-bottom:1px solid var(--line);vertical-align:middle}
+  .editor-tbl select,.editor-tbl input{background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:.35rem;padding:.3rem;font-family:inherit;font-size:.78rem;width:100%;min-width:4.5rem}
+  .editor-tbl input.qty{width:3rem;min-width:3rem}
+  .st-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:50%}
+  .st-installed{background:var(--green)} .st-needs-engineering{background:var(--cyan)}
+  .st-needs-buy{background:var(--gold)} .st-none{background:var(--dim)}
+  .xbtn{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:.3rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit}
+  .sw-import{width:100%;min-height:6rem;background:var(--bg);border:1px solid var(--line);color:var(--text);
+    border-radius:.4rem;padding:.5rem;font-family:inherit;font-size:.78rem;display:none}
+  .tblwrap-x{overflow-x:auto}
+
+  @media (max-width:680px){
+    .body{grid-template-columns:1fr;grid-template-rows:1fr auto}
+    nav{flex-direction:row;order:2;border-right:none;border-top:1px solid var(--line);
+      justify-content:space-around;padding:.35rem;position:sticky;bottom:0}
+    .tab{flex-direction:column;gap:.15rem;font-size:.72rem;padding:.45rem .3rem;flex:1;text-align:center}
+    .tab.active{box-shadow:inset 0 3px 0 var(--orange)}
+    main{order:1}
+    .logo{font-size:.95rem}
+  }
+</style>
+</head>
+<body>
+  <header>
+    <div class="logo">ELITE<b>OPS</b></div>
+    <div class="chips" id="chips">
+      <div class="chip"><span class="k">Cmdr</span><span class="v" id="cmdr">–</span></div>
+      <div class="chip"><span class="k">System</span><span class="v" id="system">–</span></div>
+      <div class="chip"><span class="k">At</span><span class="v" id="location">–</span></div>
+      <div class="chip"><span class="k">Ship</span><span class="v" id="ship">–</span></div>
+      <div class="chip"><span class="k">Fuel</span><span class="v" id="fuel">–</span></div>
+      <div class="chip"><span class="k">Cargo</span><span class="v" id="cargo">–</span></div>
+      <div class="chip" id="eddChip" title="EDDiscovery history bridge"><span class="k">EDD</span><span class="v off" id="edd">–</span></div>
+    </div>
+    <span class="live" id="live" title="live link"></span>
+  </header>
+
+  <div class="body">
+    <nav id="nav">
+      <div class="tab active" data-view="route"><span class="i">🚚</span><span>Route</span></div>
+      <div class="tab" data-view="nav"><span class="i">🧭</span><span>Navigate</span></div>
+      <div class="tab" data-view="system"><span class="i">🪐</span><span>System</span></div>
+      <div class="tab" data-view="ship"><span class="i">🛠️</span><span>Shipwright</span></div>
+      <div class="tab" data-view="exo"><span class="i">🧬</span><span>Exo</span></div>
+      <div class="tab" data-view="guardian"><span class="i">🔷</span><span>Guardian</span></div>
+      <div class="tab" data-view="engmat"><span class="i">🧪</span><span>Materials</span></div>
+      <div class="tab" data-view="cg"><span class="i">🏆</span><span>Goals</span></div>
+      <div class="tab" data-view="colony"><span class="i">🏗️</span><span>Colony</span></div>
+      <div class="tab" data-view="firsts"><span class="i">★</span><span>Firsts</span></div>
+    </nav>
+    <main>
+      <section class="view active" id="view-route">
+        <h2>Route &amp; Cargo</h2>
+        <div class="card">
+          <div class="cargo-form">
+            <div class="field"><label>From system</label><input id="f-system" type="text" placeholder="current"></div>
+            <div class="field"><label>Start station <small class="muted">(optional)</small></label><input id="f-station" type="text" placeholder="nearest market"></div>
+            <div class="field"><label>Cargo (t)</label><input id="f-cargo" type="number" min="1" step="1"></div>
+            <div class="field"><label>Max jump (ly)</label><input id="f-jump" type="number" min="1" step="0.1"></div>
+            <div class="field"><label>Max hops</label><input id="f-hops" type="number" min="1" max="10" step="1" value="5"></div>
+            <label class="toggle"><input id="f-large" type="checkbox" checked> Large pad only</label>
+            <label class="toggle"><input id="f-space" type="checkbox"> Space stations only</label>
+            <label class="toggle"><input id="f-loop" type="checkbox" checked> Loop back to start</label>
+            <div class="formbtns">
+              <button class="btn" id="f-go">Generate</button>
+              <button class="btn ghost" id="f-reset">Clear</button>
+            </div>
+          </div>
+        </div>
+        <div class="cargo-status" id="cargoStatus"></div>
+        <div id="cargoResult"></div>
+      </section>
+      <section class="view" id="view-nav">
+        <h2>Navigation Assistant</h2>
+        <div id="navHero" class="hero k-Continue">
+          <div class="kick">Recommended</div>
+          <div class="title">Waiting for the journal…</div>
+          <div class="detail"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <b id="navSystem" class="muted">—</b>
+            <span id="navFss" class="muted" style="font-size:.85rem"></span>
+          </div>
+          <div class="var-bar"><div id="varFill" class="var-fill" style="width:0%"></div></div>
+          <div id="varText" class="muted" style="font-size:.85rem">No unsold data at risk.</div>
+          <div class="thr">Cash-in alert at
+            <input id="navThreshold" type="number" min="0" step="1000000" value="20000000">cr
+            <button class="btn ghost" id="navSetThr" style="padding:.3rem .7rem">Set</button>
+          </div>
+        </div>
+        <div class="card" id="navAltCard" style="display:none">
+          <h2 style="font-size:1rem">Other options</h2>
+          <div id="navAlts" class="alts"></div>
+        </div>
+        <div class="card" id="navTargetCard" style="display:none">
+          <h2 style="font-size:1rem">Worth mapping here</h2>
+          <div class="tblwrap"><table class="nav-t">
+            <thead><tr><th>Body</th><th>Type</th><th class="r">Bio</th><th class="r">Value</th><th class="r">Dist (ls)</th><th>Mapped</th></tr></thead>
+            <tbody id="navTargets"></tbody>
+          </table></div>
+        </div>
+      </section>
+      <section class="view" id="view-ship">
+        <h2>Shipwright</h2>
+        <div class="card">
+          <div class="sw-eyebrow">Your ship — live in-game</div>
+          <div class="sw-shipname" id="swShipName">–</div>
+          <div class="muted" id="swShipMeta" style="font-size:.82rem"></div>
+          <div class="matbar" id="swMats"></div>
+          <div class="sw-mods" id="swMods"></div>
+        </div>
+        <div class="card">
+          <div class="sw-eyebrow">Build plan — the loadout you're working toward</div>
+          <div class="sw-shipname" id="swBuildTitle" style="font-size:1.05rem">No build open</div>
+          <div class="sw-toolbar" style="margin-top:.6rem">
+            <select id="swSaved" title="saved builds"><option value="">— saved builds —</option></select>
+            <button class="btn ghost" id="swLoad" style="padding:.4rem .7rem">Load</button>
+            <button class="btn" id="swSave" style="padding:.4rem .8rem">Save</button>
+            <button class="btn ghost" id="swDelete" style="padding:.4rem .7rem">Delete</button>
+            <span style="flex:1"></span>
+            <select id="swPresetSel" title="load a bundled build"><option value="">— presets —</option></select>
+            <button class="btn ghost" id="swImportBtn" style="padding:.4rem .7rem">Import</button>
+            <button class="btn ghost" id="swExport" style="padding:.4rem .7rem">Export file</button>
+          </div>
+          <div class="sw-toolbar">
+            <label class="muted" style="font-size:.78rem">Hull</label>
+            <select id="swHull"><option value="">— select ship —</option></select>
+            <input id="swBuildName" type="text" placeholder="build name" style="flex:1;min-width:9rem">
+            <button class="btn ghost" id="swAdd" style="padding:.4rem .7rem">+ Module</button>
+          </div>
+          <textarea class="sw-import" id="swImport" placeholder="Paste an eliteops.shipbuild/1 JSON here, then click Import again to load."></textarea>
+          <div class="tblwrap-x">
+            <table class="editor-tbl">
+              <thead><tr>
+                <th></th><th>Category</th><th>Type</th><th>Cls</th><th>Rat</th>
+                <th>Blueprint</th><th>G</th><th>Experimental</th><th>Qty</th><th>Acquire</th><th></th>
+              </tr></thead>
+              <tbody id="swRows"></tbody>
+            </table>
+          </div>
+          <div class="muted" id="swEmpty" style="font-size:.82rem;margin-top:.5rem">Pick a hull or load a preset to start a build. Dropdowns filter by type — Hardpoint shows only weapons.</div>
+        </div>
+        <div class="card" id="swMatCard" style="display:none">
+          <h2 style="font-size:1rem">Materials to finish this build <small class="muted" id="swMatSummary"></small></h2>
+          <div class="tblwrap-x"><table class="firsts" id="swMatTable">
+            <thead><tr><th>Material</th><th>Category</th><th class="r">Need</th><th class="r">Have</th><th class="r">Short</th><th>Used by</th></tr></thead>
+            <tbody id="swMatRows"></tbody>
+          </table></div>
+          <div class="muted" id="swUnmapped" style="font-size:.78rem;margin-top:.5rem"></div>
+        </div>
+        <div class="card" id="swEngCard" style="display:none">
+          <h2 style="font-size:1rem">Engineers for this build <small class="muted">— who unlocks each blueprint (● = unlocked for you)</small></h2>
+          <div class="tblwrap-x"><table class="firsts">
+            <thead><tr><th>Module</th><th>Blueprint</th><th class="r">G</th><th>Engineers</th></tr></thead>
+            <tbody id="swEngRows"></tbody>
+          </table></div>
+        </div>
+        <div class="card" id="swAcqCard" style="display:none">
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <h2 style="font-size:1rem;margin:0">Where to buy — this build</h2>
+            <button class="btn" id="swAcqBtn" style="padding:.4rem .8rem">Find modules (Spansh)</button>
+            <span class="muted" id="swAcqStatus" style="font-size:.82rem"></span>
+          </div>
+          <div id="swAcqStops" style="margin-top:.6rem"></div>
+        </div>
+      </section>
+      <section class="view" id="view-system">
+        <h2>System Scan</h2>
+        <div id="sysBanner" class="banner none">Waiting for the journal…</div>
+        <div class="tally" id="sysStats"></div>
+        <div class="card" id="sysHiCard" style="display:none">
+          <div class="sw-eyebrow">Worth stopping for</div>
+          <div id="sysHighlights" class="g-mods"></div>
+        </div>
+        <div class="card">
+          <div id="sysBodies"></div>
+        </div>
+      </section>
+      <section class="view" id="view-exo">
+        <h2>Exobiology</h2>
+        <div class="card">
+          <div class="sw-eyebrow">Current system — live</div>
+          <div class="sw-shipname" id="exoSystem">–</div>
+          <div class="matbar" id="exoSession"></div>
+          <div id="exoBodies" style="margin-top:.5rem"></div>
+        </div>
+        <div class="card">
+          <div class="sw-eyebrow">Exobiology route (Spansh) — richest bio systems near you</div>
+          <div class="cargo-form" style="margin-top:.4rem">
+            <div class="field"><label>From system</label><input id="x-from" type="text" placeholder="current"></div>
+            <div class="field"><label>Jump range (ly)</label><input id="x-jump" type="number" min="1" step="0.1"></div>
+            <div class="field"><label>Radius (ly)</label><input id="x-radius" type="number" min="10" step="10" value="100"></div>
+            <div class="field"><label>Min value/system (M)</label><input id="x-minval" type="number" min="0" step="1" value="1"></div>
+            <div class="field"><label>Max systems</label><input id="x-max" type="number" min="1" max="50" step="1" value="20"></div>
+            <label class="toggle"><input id="x-loop" type="checkbox"> Loop back</label>
+            <div class="formbtns"><button class="btn" id="x-go">Generate</button></div>
+          </div>
+        </div>
+        <div class="cargo-status" id="exoStatus"></div>
+        <div id="exoRoute"></div>
+      </section>
+      <section class="view" id="view-guardian">
+        <h2>Guardian Modules</h2>
+        <div class="card">
+          <div class="sw-eyebrow">Pick what you want to unlock</div>
+          <div id="gMods" class="g-mods"></div>
+        </div>
+        <div class="card" id="gReqCard" style="display:none">
+          <h2 style="font-size:1rem">Materials to unlock <small class="muted" id="gReqSummary"></small></h2>
+          <div id="gBySource" class="tally" style="margin:.2rem 0 .5rem"></div>
+          <div id="gReqGroups"></div>
+          <div id="gMarkets" style="margin-top:.5rem"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <h2 style="font-size:1rem;margin:0">Nearest Guardian Tech Broker</h2>
+            <button class="btn" id="gBrokerBtn" style="padding:.4rem .8rem">Find (Spansh)</button>
+            <span class="muted" id="gBrokerStatus" style="font-size:.82rem"></span>
+          </div>
+          <div class="muted" style="font-size:.75rem;margin-top:.3rem"><b style="color:var(--green)">Guardian brokers only</b> — stations with a Tech Broker AND a High-Tech economy (Frontier's rule for Guardian vs Human).</div>
+          <div id="gBrokerStops" style="margin-top:.5rem"></div>
+        </div>
+        <div class="card">
+          <h2 style="font-size:1rem">Farming guide <small class="muted">— where the materials drop</small></h2>
+          <div class="muted" style="font-size:.82rem;margin-bottom:.5rem">
+            <b style="color:var(--gold)">Structures</b> (Sentinel sites): power cells/conduits, tech &amp; wreckage components, weapon parts — shoot the Sentinels.
+            <b style="color:var(--cyan)">Ruins</b>: Pattern obelisk data &amp; blueprint fragments — scan obelisks. The <b>Synuefe</b> region is the main farming area.
+          </div>
+          <div id="gSites" class="stops"></div>
+        </div>
+      </section>
+      <section class="view" id="view-colony">
+        <h2>Colonization</h2>
+        <div id="colConstruction"></div>
+        <div id="colSources"></div>
+        <div class="card">
+          <div class="sw-toolbar" style="margin:0">
+            <h2 style="font-size:1rem;margin:0">Where to expand</h2>
+            <label class="muted" style="font-size:.78rem">radius</label>
+            <input id="colRadius" type="number" min="10" max="100" step="5" value="40" style="width:5rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.4rem">
+            <button class="btn" id="colFind" style="padding:.4rem .8rem">Find candidates</button>
+            <span class="muted" id="colCandStatus" style="font-size:.82rem"></span>
+          </div>
+          <div class="muted" style="font-size:.75rem;margin:.3rem 0 .5rem">Unpopulated systems near you, scored for a colony (valuable bodies, exobiology, body count). Heatmap: top-down map around you — brighter = better spot. Tap a dot to copy the system.</div>
+          <div class="heatwrap"><div id="colHeatmap"></div><div id="colCandidates" style="flex:1;min-width:14rem"></div></div>
+        </div>
+      </section>
+      <section class="view" id="view-cg">
+        <h2>Community Goals</h2>
+        <div class="card">
+          <div id="cgInaraStatus" style="font-size:.82rem"></div>
+          <div class="sw-toolbar" style="margin-top:.4rem">
+            <input id="cgInaraKey" type="password" placeholder="INARA API key" autocomplete="off" style="flex:1;min-width:10rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.5rem;font-family:inherit">
+            <button class="btn ghost" id="cgInaraSave" style="padding:.4rem .8rem">Save key</button>
+          </div>
+          <div class="muted" style="font-size:.72rem;margin-top:.25rem">Free key: inara.cz → your profile → Settings → 3rd-party APIs → generate an “INARA API key”. Stored locally on your PC only; leave blank &amp; Save to remove.</div>
+        </div>
+        <div class="muted" id="cgUpdated" style="font-size:.8rem;margin:.2rem 0 .6rem"></div>
+        <div id="cgGoals"></div>
+      </section>
+      <section class="view" id="view-engmat">
+        <h2>Engineering Materials</h2>
+        <div class="tally" id="emCounts"></div>
+        <div class="card">
+          <div class="sw-toolbar" style="margin:0">
+            <h2 style="font-size:1rem;margin:0">Your materials</h2>
+            <span id="invSummary" class="muted" style="font-size:.76rem;flex:1;min-width:8rem"></span>
+            <input id="invFilter" type="text" placeholder="filter…" style="width:8rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.4rem;font-family:inherit;font-size:.82rem">
+            <label class="toggle" style="padding:0;font-size:.8rem"><input id="invHideEmpty" type="checkbox"> hide empty</label>
+          </div>
+          <div id="invGrid" class="inv-cols" style="margin-top:.6rem"></div>
+        </div>
+        <div class="card">
+          <div class="sw-toolbar" style="margin:0">
+            <label class="muted" style="font-size:.78rem">Where do I get</label>
+            <input id="emSearch" type="text" placeholder="material or commodity name…" style="flex:1;min-width:10rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.5rem;font-family:inherit">
+          </div>
+          <div id="emLookupResults" style="margin-top:.4rem"></div>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <h2 style="font-size:1rem;margin:0">Nearest Material Traders</h2>
+            <button class="btn" id="emTradersBtn" style="padding:.4rem .8rem">Find (Spansh)</button>
+            <span class="muted" id="emTradersStatus" style="font-size:.82rem"></span>
+          </div>
+          <div class="muted" id="emTraderInfo" style="font-size:.78rem;margin-top:.4rem"></div>
+          <div class="muted" style="font-size:.72rem;margin-top:.25rem"><i>Trader <b>type</b> is exact (Frontier's economy rule); Spansh can't confirm a trader is present, so verify on arrival.</i></div>
+          <div id="emTraders" style="margin-top:.6rem"></div>
+        </div>
+        <div id="emGuide"></div>
+      </section>
+      <section class="view" id="view-firsts">
+        <h2>Firsts Radar</h2>
+        <div id="firstsBanner" class="banner none">Waiting for the journal…</div>
+        <div id="firstsTally" class="tally"></div>
+        <div id="firstsCareer" class="tally" style="display:none"></div>
+        <div class="card">
+          <div class="tblwrap"><table class="firsts">
+            <thead><tr><th>Body</th><th>Type</th><th class="r">Dist (ls)</th><th class="r">Bio</th><th class="r">Value</th><th>Firsts available</th></tr></thead>
+            <tbody id="firstsRows"><tr><td colspan="6" class="muted">No bodies scanned in this system yet — honk (FSS) or scan a body.</td></tr></tbody>
+          </table></div>
+          <div class="legend">
+            <span class="d" style="background:var(--orange)"></span>first footfall
+            <span class="d" style="background:var(--gold)"></span>first discovery
+            <span class="d" style="background:var(--cyan)"></span>first map
+            <span class="d" style="background:var(--green)"></span>bio~first (undiscovered system)
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  const v = t.dataset.view;
+  document.querySelectorAll('.view').forEach(s => s.classList.toggle('active', s.id === 'view-' + v));
+}));
+
+function fmt(v){ return (v === null || v === undefined || v === '') ? '–' : v; }
+
+async function tick(){
+  try{
+    const r = await fetch('/api/state', {cache:'no-store'});
+    const s = await r.json();
+    $('live').classList.add('ok');
+    $('cmdr').textContent = fmt(s.commander);
+    $('system').textContent = fmt(s.system);
+    const loc = s.docked ? (s.station || 'docked') : (s.body || 'in flight');
+    $('location').textContent = fmt(loc);
+    const locEl = $('location'); locEl.className = 'v ' + (s.docked ? 'on' : 'off');
+    $('ship').textContent = fmt(s.ship);
+    $('fuel').textContent = s.fuel_main != null ? (Math.round(s.fuel_main*10)/10)+'t' : '–';
+    const cap = s.cargo_capacity ? '/'+s.cargo_capacity : '';
+    $('cargo').textContent = (s.cargo_tons!=null ? s.cargo_tons : 0)+cap+'t';
+    window._state = s;
+  }catch(e){
+    $('live').classList.remove('ok');
+  }
+}
+
+/* ---- cargo tool ---- */
+const cr = v => {
+  if(v==null || isNaN(v)) return '–';
+  const a=Math.abs(v);
+  if(a>=1e6) return (v/1e6).toFixed(2)+'M';
+  if(a>=1e3) return Math.round(v/1e3)+'k';
+  return ''+Math.round(v);
+};
+const esc = t => (t==null?'':(''+t)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+let cargoPrefilled = false, cargoDirty = false;
+['f-system','f-station','f-cargo','f-jump','f-hops'].forEach(id =>
+  document.addEventListener('input', e => { if(e.target.id===id) cargoDirty = true; }));
+
+async function prefillCargo(force){
+  if(cargoDirty && !force) return;
+  try{
+    const p = await (await fetch('/api/cargo/prefill',{cache:'no-store'})).json();
+    if(!$('f-system').value || force) $('f-system').value = p.system || '';
+    if(!$('f-cargo').value || force) $('f-cargo').value = p.cargo || 720;
+    if((!$('f-jump').value || force) && p.jump_range) $('f-jump').value = p.jump_range;
+    cargoPrefilled = true;
+  }catch(e){}
+}
+
+async function genCargo(){
+  const body = {
+    system: $('f-system').value.trim(),
+    station: $('f-station').value.trim(),
+    cargo: parseInt($('f-cargo').value)||720,
+    max_hops: parseInt($('f-hops').value)||5,
+    max_hop_distance: parseFloat($('f-jump').value)||50,
+    large_pad_only: $('f-large').checked,
+    allow_planetary: !$('f-space').checked,
+    loop: $('f-loop').checked,
+  };
+  if(!body.system){ $('f-system').focus(); return; }
+  $('f-go').disabled = true;
+  try{ await fetch('/api/cargo/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+  catch(e){}
+  $('f-go').disabled = false;
+}
+
+async function cargoPost(path, body){
+  try{ await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); }catch(e){}
+  cargoTick();
+}
+window.copySys = s => cargoPost('/api/cargo/copy',{system:s});
+window.gotoStop = i => cargoPost('/api/cargo/goto',{index:i});
+window.skipHop = h => cargoPost('/api/cargo/skip',{hop:h});
+
+function renderStops(stops, cur){
+  if(!stops.length) return '';
+  let h = '<div class="stops">';
+  stops.forEach((s,i)=>{
+    const done = i < cur, isCur = s.current;
+    const mk = (state)=> state==='on'?'<span class="mk on">✓</span>':state==='cur'?'<span class="mk cur">▶</span>':'<span class="mk off">○</span>';
+    let rows = '';
+    if(s.has_sell){
+      const st = done||s.sold ? 'on' : (isCur?'cur':'off');
+      rows += `<div class="act">${mk(st)}<span class="txt ${st==='on'?'done':''}">Sell ${esc(s.sell_label)}</span></div>`;
+    }
+    if(s.has_buy){
+      const st = done||s.bought ? 'on' : ((isCur&&(s.sold||!s.has_sell))?'cur':'off');
+      rows += `<div class="act">${mk(st)}<span class="txt ${st==='on'?'done':''}">Buy ${esc(s.buy_label)}</span></div>`;
+    }
+    if(s.fly_system){
+      rows += `<div class="act">${mk(done?'on':'off')}<span class="txt">Fly to ${esc(s.fly_system)} <small class="muted">/ ${esc(s.fly_station)}</small></span>`+
+              `<button class="copybtn" onclick="event.stopPropagation();copySys('${esc(s.fly_system)}')">⧉ copy</button></div>`;
+    }else{
+      rows += `<div class="act"><span class="mk off">◇</span><span class="txt muted">Final stop — sell here</span></div>`;
+    }
+    h += `<div class="stop ${isCur?'cur':''} ${done?'done':''}" onclick="gotoStop(${i})">`+
+         `<div class="stop-h"><span class="num">${s.n}</span>`+
+         `<span class="place">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
+         `${isCur?'<span class="tag">HERE</span>':''}${s.skipped?'<span class="tag">skip</span>':''}</div>${rows}</div>`;
+  });
+  return h+'</div>';
+}
+
+function renderTable(route){
+  let rows = '';
+  route.hops.forEach(h=>{
+    const coms = h.commodities.map(c=>`${esc(c.name)} <span class="muted">×${c.amount}</span>`).join('<br>');
+    rows += `<tr class="${h.skipped?'skip':''}">`+
+      `<td class="num">${h.n}</td>`+
+      `<td class="cargo-cell">${coms}</td>`+
+      `<td>${esc(h.from_station)}<br><small class="muted">${esc(h.from_system)}</small></td>`+
+      `<td>${esc(h.to_station)}<br><small class="muted">${esc(h.to_system)}</small></td>`+
+      `<td>${h.distance!=null?Math.round(h.distance):'–'}</td>`+
+      `<td class="profit">${cr(h.profit)}</td>`+
+      `<td><button class="skipbtn" onclick="skipHop(${h.n-1})">${h.skipped?'unskip':'skip'}</button></td></tr>`;
+  });
+  return `<div class="tblwrap"><table class="route"><thead><tr>`+
+    `<th>#</th><th>Cargo</th><th>Buy at</th><th>Sell at</th><th>Ly</th><th>Profit</th><th></th>`+
+    `</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+let lastCargoStatus = '';
+async function cargoTick(){
+  let c;
+  try{ c = await (await fetch('/api/cargo',{cache:'no-store'})).json(); }catch(e){ return; }
+  const st = $('cargoStatus');
+  if(c.status==='generating'){ st.className='cargo-status gen'; st.textContent='◷ Searching Spansh for the best cargo route…'; }
+  else if(c.status==='error'){ st.className='cargo-status err'; st.textContent='⚠ '+c.error; }
+  else if(c.status==='ready' && c.route){
+    st.className='cargo-status ok';
+    const r=c.route;
+    st.textContent = `Route ready · ${cr(r.total_profit)} cr profit · ${r.total_distance} ly` + (c.clipboard_note?('  ·  '+c.clipboard_note):'');
+  } else { st.className='cargo-status'; st.textContent=''; }
+
+  const box = $('cargoResult');
+  if(c.status==='ready' && c.route){
+    const r=c.route;
+    let head = '<div class="card"><div class="grid2">'+
+      `<div class="stat"><div class="k">Total profit</div><div class="v">${cr(r.total_profit)}</div></div>`+
+      `<div class="stat"><div class="k">Distance</div><div class="v">${r.total_distance} ly</div></div>`+
+      `<div class="stat"><div class="k">Hops</div><div class="v">${r.hops.length}</div></div>`+
+      `<div class="stat"><div class="k">Stops</div><div class="v">${c.stops.length}</div></div>`+
+      '</div></div>';
+    box.innerHTML = head +
+      '<div class="card"><h2 style="font-size:1rem">Checklist <small class="muted">— auto-ticks as you dock, sell &amp; buy</small></h2>'+
+        renderStops(c.stops, c.current_stop)+'</div>'+
+      '<div class="card"><h2 style="font-size:1rem">Full route</h2>'+renderTable(r)+'</div>';
+  } else if(c.status!=='generating'){
+    box.innerHTML = '';
+  }
+}
+
+$('f-go').addEventListener('click', genCargo);
+$('f-reset').addEventListener('click', ()=>{ cargoDirty=false; cargoPost('/api/cargo/reset',{}); prefillCargo(true); });
+
+/* ---- firsts radar ---- */
+async function firstsTick(){
+  let f;
+  try{ f = await (await fetch('/api/firsts',{cache:'no-store'})).json(); }catch(e){ return; }
+  const banner = $('firstsBanner');
+  const worth = f.firsts_value ? ('  —  ~'+cr(f.firsts_value)+' cr in firsts') : '';
+  const bc = f.body_count ? ` · ${f.scanned}/${f.body_count} scanned` : (f.scanned?` · ${f.scanned} scanned`:'');
+  if(f.undiscovered){
+    banner.className='banner undisc';
+    banner.innerHTML = `★ ${esc(f.system||'?')} — UNDISCOVERED SYSTEM${worth}<small>every scanned body here is a first discovery${bc}</small>`;
+  } else if(f.available){
+    banner.className='banner some';
+    banner.innerHTML = `${esc(f.system||'?')} — ${f.available} bodies with a first${worth}<small>firsts still available to claim${bc}</small>`;
+  } else {
+    banner.className='banner none';
+    banner.innerHTML = `${esc(f.system||'?')||'Waiting for the journal…'} — no firsts here<small>${bc||'jump to an unexplored system to find some'}</small>`;
+  }
+
+  const t = f.tally || {};
+  $('firstsTally').innerHTML =
+    `<span class="tchip">discoveries <b>${t.first_discovery||0}</b></span>`+
+    `<span class="tchip">maps <b>${t.first_map||0}</b></span>`+
+    `<span class="tchip">footfalls <b>${t.first_footfall||0}</b></span>`+
+    `<span class="tchip">new codex <b>${t.codex_new||0}</b></span>`+
+    `<span class="tchip">first-logged sold <b>${t.first_logged_sold||0}</b></span>`;
+
+  const body = $('firstsRows');
+  if(!f.rows.length){
+    body.innerHTML = '<tr><td colspan="6" class="muted">No bodies scanned in this system yet — honk (FSS) or scan a body.</td></tr>';
+    return;
+  }
+  body.innerHTML = f.rows.map(b=>{
+    const dist = b.distance_ls!=null ? Math.round(b.distance_ls).toLocaleString() : '–';
+    const badges = (b.badges||[]).map(x=>{
+      const cls = x.startsWith('BIO')?'BIO':x;
+      return `<span class="bdg ${cls}">${esc(x)}</span>`;
+    }).join('') || '<span class="muted">–</span>';
+    return `<tr class="${b.category}">`+
+      `<td class="body">${esc(b.name)}</td>`+
+      `<td>${esc(b.kind)}</td>`+
+      `<td class="r">${dist}</td>`+
+      `<td class="r">${b.bio||''}</td>`+
+      `<td class="r">${cr(b.value)}</td>`+
+      `<td>${badges}</td></tr>`;
+  }).join('');
+}
+
+/* ---- navigation assistant ---- */
+let navThrDirty = false;
+document.addEventListener('input', e => { if(e.target.id==='navThreshold') navThrDirty = true; });
+$('navSetThr').addEventListener('click', async ()=>{
+  const t = parseInt($('navThreshold').value)||0;
+  try{ await fetch('/api/nav/threshold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({threshold:t})}); }catch(e){}
+  navThrDirty = false; navTick();
+});
+
+async function navTick(){
+  let n;
+  try{ n = await (await fetch('/api/nav',{cache:'no-store'})).json(); }catch(e){ return; }
+  const p = n.primary || {kind:'Continue',title:'Continue exploring',detail:'',confidence:'Estimated'};
+  const hero = $('navHero');
+  hero.className = 'hero k-'+(p.kind||'Continue');
+  hero.querySelector('.title').textContent = p.title;
+  hero.querySelector('.detail').textContent = p.detail || '';
+  let conf = hero.querySelector('.conf');
+  if(!conf){ conf = document.createElement('div'); conf.className='conf'; hero.appendChild(conf); }
+  conf.textContent = (p.confidence||'') + (p.score!=null?('  ·  '+Math.round(p.score*100)+'% priority'):'');
+
+  $('navSystem').textContent = n.system || 'No system';
+  const fss = n.fss||{};
+  const ch = n.charted;
+  const fssEl = $('navFss');
+  if(ch && ch.charted){
+    fssEl.innerHTML = `<span style="color:var(--cyan)">✓ charted in EDSM</span> · ${ch.known} bodies · no FSS needed`;
+  } else {
+    fssEl.textContent = fss.total!=null
+      ? `FSS ${fss.scanned}/${fss.total}${fss.complete?' ✓':''}`
+      : (n.system ? 'not honked yet' : '');
+  }
+
+  const var_ = n.value_at_risk||{};
+  const thr = var_.threshold||0, val = var_.unsold_value||0;
+  const pct = thr>0 ? Math.min(100, val/thr*100) : 0;
+  const fill = $('varFill');
+  fill.style.width = pct+'%';
+  fill.classList.toggle('over', thr>0 && val>=thr);
+  $('varText').textContent = val>0
+    ? `${cr(val)} cr unsold across ${var_.unsold_bodies} bodies`+(thr>0?` · ${Math.round(pct)}% of your ${cr(thr)} alert`:'')
+    : 'No unsold data at risk.';
+  if(!navThrDirty && document.activeElement!==$('navThreshold')) $('navThreshold').value = thr;
+
+  const alts = n.alternatives||[];
+  $('navAltCard').style.display = alts.length ? 'block' : 'none';
+  $('navAlts').innerHTML = alts.map(a=>
+    `<div class="alt"><span class="at">${esc(a.title)}</span><span class="ad">${esc(a.detail||'')}</span>`+
+    `<span class="as">${Math.round((a.score||0)*100)}%</span></div>`).join('');
+
+  const targets = n.targets||[];
+  $('navTargetCard').style.display = targets.length ? 'block' : 'none';
+  $('navTargets').innerHTML = targets.map(t=>{
+    const terra = t.terraformable ? ' <span class="muted">(terra)</span>' : '';
+    return `<tr><td>${esc(t.name)}${terra}</td><td>${esc(t.kind)}</td>`+
+      `<td class="r">${t.bio||''}</td><td class="r">${cr(t.value)}</td>`+
+      `<td class="r">${t.distance_ls!=null?Math.round(t.distance_ls).toLocaleString():'–'}</td>`+
+      `<td class="${t.mapped_by_me?'m-yes':'m-no'}">${t.mapped_by_me?'yes':'no'}</td></tr>`;
+  }).join('');
+}
+
+/* ---- shipwright ---- */
+const sw = { ships:[], mods:{}, bp:{}, build:null, snap:null };
+const CATS = ['core','optional','hardpoint','utility','bulkheads'];
+const ACQ = ['Automatic','Shipyard','StandardOutfitting','GuardianTechBroker','HumanTechBroker','EngineerWorkshop','Powerplay','PreEngineered','MissionReward'];
+
+async function jget(u){ return (await fetch(u,{cache:'no-store'})).json(); }
+async function ensureModules(cat){ if(cat && !sw.mods[cat]) sw.mods[cat] = await jget('/api/catalog/modules?category='+cat); return sw.mods[cat]||[]; }
+async function ensureBp(grp){ if(grp && !sw.bp[grp]) sw.bp[grp] = await jget('/api/catalog/blueprints?grp='+encodeURIComponent(grp)); return sw.bp[grp]||{blueprints:[],experimentals:[]}; }
+
+async function loadShips(){
+  if(sw.ships.length) return;
+  sw.ships = await jget('/api/catalog/ships');
+  $('swHull').innerHTML = '<option value="">— select ship —</option>' +
+    sw.ships.map(s=>`<option value="${s.key}">${esc(s.name)}</option>`).join('');
+}
+
+function opt(v,label,sel){ return `<option value="${esc(v)}"${v==sel?' selected':''}>${esc(label)}</option>`; }
+function sel(field,idx,options,val,ph){
+  const head = ph!=null ? `<option value="">${esc(ph)}</option>` : '';
+  return `<select data-field="${field}" data-idx="${idx}">${head}${options}</select>`;
+}
+
+function updateBuildTitle(){
+  const el=$('swBuildTitle'); if(!el) return;
+  if(!sw.build){ el.textContent='No build open — pick a hull or load a saved build'; return; }
+  const s=sw.ships.find(x=>x.key===sw.build.ship);
+  const ship = s ? s.name : (sw.build.hull_name || 'no hull set');
+  el.textContent = (sw.build.name||'Untitled build') + '  —  ' + ship;
+}
+
+function renderRows(){
+  updateBuildTitle();
+  const b = sw.build;
+  $('swEmpty').style.display = (b && b.modules.length) ? 'none' : 'block';
+  if(!b){ $('swRows').innerHTML=''; return; }
+  const recon = (sw.snap && sw.snap.reconciliation) || [];
+  $('swRows').innerHTML = b.modules.map((m,i)=>{
+    const catOpts = CATS.map(c=>opt(c,c,m.category)).join('');
+    const modList = sw.mods[m.category] || [];
+    if(m.category) ensureModulesThen(m.category);
+    const typeOpts = modList.map(x=>opt(x.name,x.name,m.type)).join('');
+    const typeEntry = modList.find(x=>x.name===m.type);
+    const classes = typeEntry ? [...new Set(typeEntry.variants.map(v=>v.class))].sort((a,b)=>a-b) : [];
+    const clsOpts = classes.map(c=>opt(c,c,m.class)).join('');
+    const ratings = typeEntry ? [...new Set(typeEntry.variants.filter(v=>v.class==m.class).map(v=>v.rating))] : [];
+    const ratOpts = ratings.map(r=>opt(r,r,m.rating)).join('');
+    if(m.grp) ensureBpThen(m.grp);
+    const bp = sw.bp[m.grp] || {blueprints:[],experimentals:[]};
+    let bpNames = bp.blueprints.map(x=>x.name);
+    if(m.blueprint && !bpNames.includes(m.blueprint)) bpNames = [m.blueprint, ...bpNames];  // preserve authored value
+    const bpOpts = bpNames.map(n=>opt(n,n,m.blueprint)).join('');
+    const maxG = (bp.blueprints.find(x=>x.name===m.blueprint)||{}).maxGrade || 5;
+    const gradeOpts = Array.from({length:maxG},(_,k)=>opt(k+1,k+1,m.grade)).join('');
+    let expNames = bp.experimentals.slice();
+    if(m.experimental && !expNames.includes(m.experimental)) expNames = [m.experimental, ...expNames];
+    const expOpts = expNames.map(x=>opt(x,x,m.experimental)).join('');
+    const acqOpts = ACQ.map(a=>opt(a,a,m.acquisition)).join('');
+    const st = (recon[i]||{}).status || 'none';
+    return `<tr data-idx="${i}">`+
+      `<td><span class="st-dot st-${st}" title="${st}"></span></td>`+
+      `<td>${sel('category',i,catOpts,m.category)}</td>`+
+      `<td>${sel('type',i,typeOpts,m.type,'—')}</td>`+
+      `<td>${sel('class',i,clsOpts,m.class,'')}</td>`+
+      `<td>${sel('rating',i,ratOpts,m.rating,'')}</td>`+
+      `<td>${sel('blueprint',i,bpOpts,m.blueprint,'—')}</td>`+
+      `<td>${sel('grade',i,gradeOpts,m.grade,'')}</td>`+
+      `<td>${sel('experimental',i,expOpts,m.experimental,'—')}</td>`+
+      `<td><input class="qty" data-field="quantity" data-idx="${i}" type="number" min="1" value="${m.quantity||1}"></td>`+
+      `<td>${sel('acquisition',i,acqOpts,m.acquisition)}</td>`+
+      `<td><button class="xbtn" data-remove="${i}">✕</button></td></tr>`;
+  }).join('');
+}
+
+let _reRenderPending=false;
+function ensureModulesThen(cat){ if(!sw.mods[cat]){ ensureModules(cat).then(()=>scheduleRender()); } }
+function ensureBpThen(grp){ if(!sw.bp[grp]){ ensureBp(grp).then(()=>scheduleRender()); } }
+function scheduleRender(){ if(_reRenderPending) return; _reRenderPending=true; setTimeout(()=>{_reRenderPending=false; renderRows();},30); }
+
+let _postT=null;
+function postBuild(){
+  if(!sw.build) return;
+  sw.build.name = $('swBuildName').value || sw.build.name;
+  clearTimeout(_postT);
+  _postT=setTimeout(async()=>{
+    try{ sw.snap = await (await fetch('/api/shipwright/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(sw.build)})).json();
+      sw.build = sw.snap.build || sw.build; renderRows(); }catch(e){}
+  },250);
+}
+
+$('swRows').addEventListener('change', async e=>{
+  const t=e.target, idx=+t.dataset.idx, f=t.dataset.field;
+  if(idx==null||!f||!sw.build) return;
+  const m=sw.build.modules[idx]; let v=t.value;
+  if(f==='class'||f==='grade'||f==='quantity') v = v===''?null:parseInt(v);
+  m[f]=v;
+  if(f==='category'){ Object.assign(m,{type:null,grp:null,class:null,rating:null,blueprint:null,grade:null,experimental:null}); await ensureModules(m.category); }
+  if(f==='type'){ const me=(sw.mods[m.category]||[]).find(x=>x.name===m.type); m.grp=me?me.grp:null; Object.assign(m,{class:null,rating:null,blueprint:null,grade:null,experimental:null}); if(m.grp) await ensureBp(m.grp); }
+  if(f==='class'){ m.rating=null; }
+  if(f==='blueprint'){ m.grade=m.grade||null; }
+  renderRows(); postBuild();
+});
+$('swRows').addEventListener('click', e=>{
+  const r=e.target.dataset.remove;
+  if(r!=null && sw.build){ sw.build.modules.splice(+r,1); renderRows(); postBuild(); }
+});
+$('swAdd').addEventListener('click', ()=>{
+  if(!sw.build) sw.build = blankBuild(null);
+  sw.build.modules.push({slot:null,category:'optional',type:null,grp:null,class:null,rating:null,blueprint:null,grade:null,experimental:null,quantity:1,acquisition:'StandardOutfitting'});
+  renderRows(); postBuild();
+});
+$('swHull').addEventListener('change', ()=>{
+  const k=$('swHull').value;
+  if(!sw.build) sw.build=blankBuild(k); else sw.build.ship=k||null;
+  const s=sw.ships.find(x=>x.key===k);
+  if(s && (!$('swBuildName').value)) $('swBuildName').value=s.name;
+  renderRows(); postBuild();
+});
+$('swBuildName').addEventListener('input', ()=>postBuild());
+function blankBuild(ship){ return {schema:'eliteops.shipbuild/1',name:$('swBuildName').value||'New build',ship:ship||null,hull_name:null,role:'',notes:'',search:{useCurrentSystem:true,radiusLy:250,requireLargePad:true,includeFleetCarriers:false},rollProfile:{'1':1,'2':2,'3':4,'4':6,'5':10},modules:[]}; }
+
+async function loadPresetList(){
+  try{
+    const list = await jget('/api/presets');
+    $('swPresetSel').innerHTML = '<option value="">— presets —</option>' +
+      list.map(p=>`<option value="${esc(p.slug)}">${esc(p.name)}</option>`).join('');
+  }catch(e){}
+}
+$('swPresetSel').addEventListener('change', async e=>{
+  const slug=e.target.value; if(!slug) return;
+  try{ await applyBuild(await jget('/presets/'+slug+'.json')); }catch(err){ alert('Could not load preset.'); }
+  e.target.value='';
+});
+$('swImportBtn').addEventListener('click', async()=>{
+  const ta=$('swImport');
+  if(ta.style.display!=='block'){ ta.style.display='block'; ta.focus(); return; }
+  try{ await applyBuild(JSON.parse(ta.value)); ta.style.display='none'; ta.value=''; }
+  catch(e){ alert('Invalid JSON: '+e.message); }
+});
+$('swExport').addEventListener('click', ()=>{
+  if(!sw.build) return;
+  const blob=new Blob([JSON.stringify(sw.build,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=(sw.build.name||'build').replace(/[^a-z0-9]+/gi,'-').toLowerCase()+'.eliteops.json';
+  a.click();
+});
+async function applyBuild(b){
+  sw.snap = await (await fetch('/api/shipwright/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)})).json();
+  sw.build = sw.snap.build;
+  $('swBuildName').value = sw.build.name||'';
+  if(sw.build.ship) $('swHull').value = sw.build.ship;
+  for(const m of sw.build.modules){ await ensureModules(m.category); if(m.grp) await ensureBp(m.grp); }
+  renderRows();
+}
+
+async function shipwrightTick(){
+  let d;
+  try{ d = await jget('/api/shipwright'); }catch(e){ return; }
+  if(!sw.build && d.build){ // adopt the server's active build after a page reload
+    sw.build = d.build; $('swBuildName').value = d.build.name||'';
+    if(d.build.ship) $('swHull').value = d.build.ship;
+  }
+  if(!sw.snap || !sw.build) sw.snap = d; else sw.snap.reconciliation = d.reconciliation;
+  const cs=d.current_ship;
+  $('swShipName').textContent = cs ? cs.name : 'No ship loadout yet';
+  $('swShipMeta').textContent = cs ? `${cs.ident||''} · jump ${cs.max_jump!=null?cs.max_jump.toFixed(1):'?'} ly · cargo ${cs.cargo_capacity||0}t · ${cs.modules.length} modules · rebuy ${cr(cs.rebuy)} cr` : '';
+  const mc=d.materials.counts;
+  $('swMats').innerHTML = `<span class="matchip">Raw <b>${mc.raw}</b></span><span class="matchip">Manufactured <b>${mc.manufactured}</b></span><span class="matchip">Encoded <b>${mc.encoded}</b></span><span class="matchip">Engineers <b>${d.engineers.filter(e=>e.unlocked).length}</b>/${d.engineers.length}</span>`;
+  $('swMods').innerHTML = cs ? cs.modules.map(m=>{
+    const e=m.engineering;
+    const badge = e ? `<span class="eb">${esc(e.blueprint||'eng')} G${e.grade||'?'}</span>`+(e.experimental?`<span class="eb exp">${esc(e.experimental)}</span>`:'') : '';
+    return `<div class="sw-mod"><span class="slot">${esc(m.slot||'')}</span><span class="mn">${esc(m.name)}${m.size?` <span class="muted">(${m.size})</span>`:''}</span>${badge}</div>`;
+  }).join('') : '<div class="muted">Fly a ship to see its loadout.</div>';
+  renderSaved(d.saved_builds||[]);
+  renderMaterials(d.material_plan);
+  renderEngineers(d.engineer_plan||[]);
+  renderAcquisition(d.acquisition||{});
+  if(sw.build) renderRows();
+}
+
+function renderEngineers(list){
+  const card=$('swEngCard');
+  if(!sw.build || !list.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  $('swEngRows').innerHTML = list.map(e=>{
+    const engs = e.engineers.length ? e.engineers.map(x=>{
+      const c = x.unlocked?'var(--green)':'var(--dim)';
+      const permit = x.permit?' <span class="muted">[permit]</span>':'';
+      return `<span style="white-space:nowrap"><span style="color:${c}">●</span> ${esc(x.name)} <span class="muted" style="font-size:.72rem">${esc(x.system||'')}</span>${permit}</span>`;
+    }).join(' &nbsp; ') : '<span class="muted">no engineer in catalog for this blueprint</span>';
+    return `<tr><td>${esc(e.module)}</td><td>${esc(e.blueprint)}${e.experimental?' <span class="bdg MAP">+exp</span>':''}</td>`+
+      `<td class="r">${e.grade||''}</td><td>${engs}</td></tr>`;
+  }).join('');
+}
+
+function renderAcquisition(a){
+  const card=$('swAcqCard');
+  if(!sw.build){ card.style.display='none'; return; }
+  card.style.display='block';
+  const st=$('swAcqStatus');
+  if(a.status==='searching'){ st.textContent='◷ searching Spansh…'; }
+  else if(a.status==='error'){ st.textContent='⚠ '+a.error; }
+  else if(a.status==='ready'){ st.textContent = `from ${a.reference||'?'} · ${a.stops.length} stop(s)`; }
+  else { st.textContent=''; }
+  const box=$('swAcqStops');
+  if(a.status==='ready'){
+    let h = a.stops.length ? '<div class="stops">'+a.stops.map((s,i)=>
+      `<div class="stop"><div class="stop-h"><span class="num">${i+1}</span>`+
+      `<span class="place">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
+      `<span class="muted" style="font-size:.75rem">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''}${s.distance_ls!=null?' · '+Math.round(s.distance_ls)+' ls':''}</span></div>`+
+      `<div class="act"><span class="txt">${s.covers.map(esc).join(' · ')}</span>`+
+      `<button class="copybtn" onclick="event.stopPropagation();copySys('${esc(s.system)}')">⧉ copy</button></div></div>`
+    ).join('')+'</div>' : '<div class="muted">Nothing to buy — every module is already owned.</div>';
+    if(a.unresolved && a.unresolved.length) h += `<div class="muted" style="font-size:.78rem;margin-top:.4rem">Not found within range (try a bigger radius, or these need a Tech Broker / engineer): ${a.unresolved.map(esc).join('; ')}</div>`;
+    box.innerHTML=h;
+  } else if(a.status!=='searching'){ box.innerHTML=''; }
+}
+$('swAcqBtn').addEventListener('click', async()=>{
+  if(!sw.build) return;
+  $('swAcqStatus').textContent='◷ searching Spansh…';
+  try{ await fetch('/api/shipwright/acquire',{method:'POST'}); }catch(e){}
+  // fast-poll until ready (shipwrightTick also refreshes every 2.5s)
+  for(let i=0;i<40;i++){ await new Promise(r=>setTimeout(r,1000));
+    const d=await jget('/api/shipwright'); renderAcquisition(d.acquisition||{});
+    if((d.acquisition||{}).status!=='searching') break; }
+});
+
+function renderSaved(list){
+  const s=$('swSaved'), cur=s.value;
+  s.innerHTML = '<option value="">— saved builds —</option>' +
+    list.map(b=>`<option value="${esc(b.slug)}">${esc(b.name)} (${b.modules})</option>`).join('');
+  if(list.some(b=>b.slug===cur)) s.value=cur;
+}
+
+function renderMaterials(mp){
+  const card=$('swMatCard');
+  if(!mp || !sw.build || !mp.materials.length){ card.style.display='none'; return; }
+  card.style.display='block';
+  $('swMatSummary').textContent = `— ${mp.readyCount}/${mp.total} ready · ${mp.totalMissing} units short of ${mp.totalNeeded}`;
+  $('swMatRows').innerHTML = mp.materials.map(m=>{
+    const color = m.missing>0 ? 'var(--gold)' : 'var(--green)';
+    return `<tr><td>${esc(m.name)}</td><td class="muted">${esc(m.category||'')}</td>`+
+      `<td class="r">${m.needed}</td><td class="r">${m.owned}</td>`+
+      `<td class="r" style="color:${color};font-weight:700">${m.missing||'✓'}</td>`+
+      `<td class="muted" style="font-size:.72rem">${esc((m.usedBy||[]).join(', '))}</td></tr>`;
+  }).join('');
+  $('swUnmapped').textContent = mp.unmapped.length ? ('No recipe for: '+mp.unmapped.join('; ')) : '';
+}
+
+async function swRefresh(snap){ sw.snap=snap; sw.build=snap.build;
+  $('swBuildName').value = (sw.build&&sw.build.name)||'';
+  if(sw.build&&sw.build.ship) $('swHull').value=sw.build.ship;
+  if(sw.build) for(const m of sw.build.modules){ await ensureModules(m.category); if(m.grp) await ensureBp(m.grp); }
+  renderRows(); renderMaterials(snap.material_plan); renderSaved(snap.saved_builds||[]);
+}
+$('swSave').addEventListener('click', async()=>{
+  if(!sw.build){ alert('Nothing to save — start a build first.'); return; }
+  const name = $('swBuildName').value || sw.build.name || 'Build';
+  const r = await (await fetch('/api/shipwright/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})).json();
+  renderSaved(r.saved_builds||[]); if(r.saved) $('swSaved').value=r.saved.slug;
+});
+$('swLoad').addEventListener('click', async()=>{
+  const slug=$('swSaved').value; if(!slug) return;
+  const r=await fetch('/api/shipwright/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})});
+  if(r.ok) await swRefresh(await r.json());
+});
+$('swDelete').addEventListener('click', async()=>{
+  const slug=$('swSaved').value; if(!slug) return;
+  if(!confirm('Delete saved build "'+$('swSaved').selectedOptions[0].text+'"?')) return;
+  const snap=await (await fetch('/api/shipwright/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})})).json();
+  renderSaved(snap.saved_builds||[]);
+});
+
+/* ---- EDD bridge (optional Tier-4 history) ---- */
+async function eddTick(){
+  let e;
+  try{ e = await jget('/api/edd'); }catch(err){ return; }
+  const v=$('edd'), chip=$('eddChip');
+  if(e.present && e.readable){
+    v.textContent = e.running ? 'live' : 'history';
+    v.className = 'v on';
+    chip.title = e.message + (e.commander?(' — CMDR '+e.commander):'');
+  } else if(e.present){
+    v.textContent='busy'; v.className='v off'; chip.title=e.message;
+  } else {
+    v.textContent='off'; v.className='v off'; chip.title=e.message;
+  }
+  // lifetime overlay on the Firsts tab
+  const row=$('firstsCareer');
+  if(e.career){
+    const c=e.career;
+    row.style.display='flex';
+    row.innerHTML = '<span class="tchip" style="border-color:var(--cyan)">lifetime (EDD):</span>'+
+      `<span class="tchip">systems <b>${(c.systems_visited||0).toLocaleString()}</b></span>`+
+      `<span class="tchip">${(c.ly_traveled||0).toLocaleString()} ly</span>`+
+      `<span class="tchip">scans <b>${(c.bodies_scanned||0).toLocaleString()}</b></span>`+
+      `<span class="tchip">first-discovered <b>${c.first_discovered||0}</b></span>`+
+      `<span class="tchip">mapped <b>${c.bodies_mapped||0}</b></span>`+
+      `<span class="tchip">codex <b>${c.codex_new||0}</b></span>`;
+  } else { row.style.display='none'; }
+}
+
+/* ---- exobiology ---- */
+let exoDirty=false;
+['x-from','x-jump','x-radius','x-minval','x-max'].forEach(id=>{
+  const el=$(id); if(el) el.addEventListener('input',()=>exoDirty=true);
+});
+async function exoPrefill(){
+  if(exoDirty) return;
+  try{ const p=await jget('/api/exo/prefill');
+    if(!$('x-from').value) $('x-from').value=p.from_system||'';
+    if(!$('x-jump').value && p.jump_range) $('x-jump').value=p.jump_range;
+  }catch(e){}
+}
+$('x-go').addEventListener('click', async()=>{
+  const body={from_system:$('x-from').value.trim(), jump_range:parseFloat($('x-jump').value)||50,
+    radius:parseFloat($('x-radius').value)||100, min_value:Math.round((parseFloat($('x-minval').value)||0)*1e6),
+    max_results:parseInt($('x-max').value)||20, loop:$('x-loop').checked};
+  if(!body.from_system){ $('x-from').focus(); return; }
+  $('x-go').disabled=true;
+  try{ await fetch('/api/exo/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }catch(e){}
+  $('x-go').disabled=false;
+});
+
+async function exoTick(){
+  let d;
+  try{ d=await jget('/api/exo'); }catch(e){ return; }
+  $('exoSystem').textContent = d.system || 'No system';
+  const s=d.session||{};
+  $('exoSession').innerHTML =
+    `<span class="matchip">species sampled <b>${s.species_sampled||0}</b></span>`+
+    `<span class="matchip">unsold <b>${cr(s.unsold_value)}</b> cr (${s.unsold_count||0})</span>`+
+    `<span class="matchip">sold <b>${cr(s.sold_value)}</b> cr</span>`+
+    `<span class="matchip">new codex <b>${s.new_codex||0}</b></span>`;
+  // live bodies + sampling
+  let h='';
+  if((d.bodies||[]).length){
+    h+='<div class="sw-eyebrow" style="margin-top:.4rem">Biological signals here</div>';
+    h+=d.bodies.map(b=>`<div class="sw-mod"><span class="mn">${esc(b.body)} <span class="muted">${b.count} signal${b.count==1?'':'s'}</span></span>`+
+      `<span class="muted" style="font-size:.78rem">${(b.genuses||[]).map(esc).join(', ')}</span>`+
+      `<span class="eb exp">~${cr(b.potential_value)} cr</span></div>`).join('');
+  }
+  if((d.sampling||[]).length){
+    h+='<div class="sw-eyebrow" style="margin-top:.5rem">Sampling here</div>';
+    h+=d.sampling.map(sp=>{
+      const dots='●'.repeat(sp.scans)+'○'.repeat(3-sp.scans);
+      const col=sp.complete?'var(--green)':'var(--gold)';
+      return `<div class="sw-mod"><span style="color:${col};font-family:monospace">${dots}</span>`+
+        `<span class="mn">${esc(sp.species)}${sp.new?' <span class="bdg DISCOVERY">NEW ×5</span>':''}</span>`+
+        `<span class="eb">${cr(sp.value)} cr</span></div>`;
+    }).join('');
+  }
+  if(!h) h='<div class="muted" style="font-size:.85rem">No biological signals mapped here yet — DSS a planet with bio signals to reveal its genera, then scan on foot.</div>';
+  $('exoBodies').innerHTML=h;
+
+  // route
+  const st=$('exoStatus');
+  if(d.status==='generating'){ st.className='cargo-status gen'; st.textContent='◷ Plotting the richest exobiology route…'; }
+  else if(d.status==='error'){ st.className='cargo-status err'; st.textContent='⚠ '+d.error; }
+  else if(d.status==='ready' && d.route){ st.className='cargo-status ok'; st.textContent=`Route ready · ${cr(d.route.total_value)} cr across ${d.route.systems.length} systems`; }
+  else { st.className='cargo-status'; st.textContent=''; }
+
+  const box=$('exoRoute');
+  if(d.status==='ready' && d.route){
+    box.innerHTML='<div class="card"><div class="stops">'+d.route.systems.map(sy=>
+      `<div class="stop"><div class="stop-h"><span class="num">${sy.jumps}j</span>`+
+      `<span class="place">${esc(sy.name)}</span><span class="muted" style="font-size:.8rem">${cr(sy.total_value)} cr</span>`+
+      `<button class="copybtn" onclick="event.stopPropagation();copySys('${esc(sy.name)}')">⧉ copy</button></div>`+
+      sy.bodies.map(b=>`<div class="act"><span class="txt" style="font-size:.82rem">${esc(b.name)} `+
+        `<span class="muted">${b.distance_ls!=null?Math.round(b.distance_ls)+' ls':''}</span> — <b style="color:var(--gold)">${cr(b.landmark_value)}</b>: `+
+        `${b.species.map(sp=>esc(sp.species)+' ('+cr(sp.value)+')').join(', ')}</span></div>`).join('')+
+      '</div>').join('')+'</div></div>';
+  } else if(d.status!=='generating'){ box.innerHTML=''; }
+}
+
+/* ---- guardian ---- */
+window.gToggle = async k => { try{ await fetch('/api/guardian/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})}); }catch(e){} guardianTick(); };
+window.gFindMarket = async commodity => {
+  try{ await fetch('/api/guardian/market',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commodity})}); }catch(e){}
+  for(let i=0;i<20;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/guardian'); renderMarkets(d.markets||{}); if((d.markets[commodity]||{}).status!=='searching') break; }
+};
+function renderMarkets(markets){
+  const entries=Object.entries(markets||{}).filter(([,v])=>v.status!=='idle');
+  if(!entries.length){ $('gMarkets').innerHTML=''; return; }
+  $('gMarkets').innerHTML = entries.map(([name,v])=>{
+    if(v.status==='searching') return `<div class="muted" style="font-size:.8rem">◷ finding markets for ${esc(name)}…</div>`;
+    if(v.status==='error') return `<div class="muted err" style="font-size:.8rem">⚠ ${esc(name)}: ${esc(v.error)}</div>`;
+    if(!v.stops||!v.stops.length) return `<div class="muted" style="font-size:.8rem">${esc(name)}: no market found nearby.</div>`;
+    return `<div class="sw-eyebrow" style="color:var(--orange)">Buy ${esc(name)}</div>`+v.stops.map(s=>
+      `<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
+      `<span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''} · ${s.buy_price!=null?s.buy_price+' cr':''} · sup ${s.supply||'?'}</span>`+
+      `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉</button></div>`).join('');
+  }).join('');
+}
+$('gBrokerBtn').addEventListener('click', async()=>{
+  $('gBrokerStatus').textContent='◷ searching Spansh…';
+  try{ await fetch('/api/guardian/broker',{method:'POST'}); }catch(e){}
+  for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/guardian'); renderBroker(d.broker); if((d.broker||{}).status!=='searching') break; }
+});
+function renderBroker(b){
+  if(!b) return;
+  const st=$('gBrokerStatus');
+  if(b.status==='searching'){ st.textContent='◷ searching Spansh…'; return; }
+  if(b.status==='error'){ st.textContent='⚠ '+b.error; $('gBrokerStops').innerHTML=''; return; }
+  if(b.status==='ready'){
+    st.textContent = `from ${b.reference||'?'} · ${b.stops.length} broker(s)`;
+    $('gBrokerStops').innerHTML = '<div class="stops">'+b.stops.map((s,i)=>
+      `<div class="stop"><div class="stop-h"><span class="num">${i+1}</span>`+
+      `<span class="place">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
+      `<span class="muted" style="font-size:.75rem">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''}${s.large_pad?' · L pad':''}</span>`+
+      `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉ copy</button></div></div>`).join('')+'</div>';
+  } else { st.textContent=''; }
+}
+async function guardianTick(){
+  let d;
+  try{ d=await jget('/api/guardian'); }catch(e){ return; }
+  const order={Weapon:0,Core:1,Defence:2,Utility:3};
+  $('gMods').innerHTML = d.modules.sort((a,b)=>(order[a.group]-order[b.group])).map(m=>
+    `<div class="g-mod ${m.wanted?'on':''}" onclick="gToggle('${m.key}')"><span class="grp">${esc(m.group)}</span>${esc(m.name)}${m.ready?' <span class="rdy">✓ ready</span>':''}</div>`).join('');
+  const rc=$('gReqCard');
+  if(d.materials.length){
+    rc.style.display='block';
+    $('gReqSummary').textContent = `— ${d.wanted_count} module(s) · ${d.total_short} materials short`;
+    $('gBySource').innerHTML = Object.entries(d.by_source).map(([s,n])=>`<span class="tchip">${esc(s)} <b>${n}</b></span>`).join('') || '<span class="tchip" style="color:var(--green)">all materials ready ✓</span>';
+    const SRCCOL={Structures:'var(--gold)',Ruins:'var(--cyan)',Farm:'var(--green)',Buy:'var(--orange)'};
+    const SRCHEAD={Structures:'🔫 Guardian Structures',Ruins:'🗿 Guardian Ruins',Farm:'⛏️ Farm as materials',Buy:'🛒 Buy as commodities'};
+    const groups={}; d.materials.forEach(m=>{(groups[m.source]=groups[m.source]||[]).push(m);});
+    $('gReqGroups').innerHTML = ['Structures','Ruins','Farm','Buy'].filter(s=>groups[s]).map(src=>{
+      const mats=groups[src], col=SRCCOL[src];
+      const headHow = src==='Farm' ? 'Grind these as standard engineering materials (search the Materials tab for the exact site).' : (mats[0].how||'');
+      const siteType = src==='Ruins'?'Ruins':(src==='Structures'?'Structure':null);
+      const sites = siteType ? (d.sites||[]).filter(x=>x.type===siteType).map(x=>`<button class="copybtn" onclick="copySys('${esc(x.system)}')">⧉ ${esc(x.system)}</button>`).join(' ') : '';
+      const rows = mats.map(m=>{
+        const sc=m.short>0?'var(--gold)':'var(--green)';
+        const mkt = m.commodity?`<button class="skipbtn" onclick="gFindMarket('${esc(m.name)}')">⌘ market</button>`:'';
+        const det = src==='Farm'?`<div class="muted" style="font-size:.72rem;padding-left:.1rem">${esc(m.how)}</div>`:'';
+        return `<div class="sw-mod"><span class="mn">${esc(m.name)}</span><span class="bd">need ${m.needed} · have ${m.owned} · <b style="color:${sc}">${m.short?('short '+m.short):'ready ✓'}</b></span>${mkt}</div>${det}`;
+      }).join('');
+      return `<div class="card" style="background:var(--panel2);margin-bottom:.6rem"><div class="sw-eyebrow" style="color:${col};font-size:.85rem">${SRCHEAD[src]}</div>`+
+        `<div class="muted" style="font-size:.78rem;margin-bottom:.4rem">${esc(headHow)} ${sites}</div>${rows}</div>`;
+    }).join('');
+    renderMarkets(d.markets||{});
+  } else { rc.style.display='none'; }
+  renderBroker(d.broker);
+  $('gSites').innerHTML = d.sites.map(s=>
+    `<div class="stop"><div class="stop-h"><span class="place">${esc(s.system)} <span class="bdg ${s.type==='Ruins'?'MAP':'DISCOVERY'}">${esc(s.type)}</span></span>`+
+    `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉ copy</button></div>`+
+    `<div class="act"><span class="txt muted" style="font-size:.8rem">${esc(s.note)}</span></div></div>`).join('');
+}
+
+/* ---- system scan ---- */
+const sysOpen = new Set();
+window.sysToggleBody = id => { if(sysOpen.has(id)) sysOpen.delete(id); else sysOpen.add(id); systemTick(); };
+function sysNum(v,suf,dp){ return v==null?'':(dp?(+v).toFixed(dp):Math.round(v).toLocaleString())+(suf||''); }
+async function systemTick(){
+  let d;
+  try{ d=await jget('/api/system'); }catch(e){ return; }
+  const banner=$('sysBanner');
+  const bc = d.body_count!=null ? `${d.scanned}/${d.body_count} scanned` : (d.scanned?`${d.scanned} scanned`:'');
+  const worth = d.total_value ? ' · ~'+cr(d.total_value)+' cr' : '';
+  if(d.undiscovered){ banner.className='banner undisc'; banner.innerHTML=`★ ${esc(d.system||'?')} — UNDISCOVERED SYSTEM<small>${bc}${worth}</small>`; }
+  else if(d.scanned){ banner.className='banner some'; banner.innerHTML=`${esc(d.system||'?')}<small>${bc}${worth}</small>`; }
+  else { banner.className='banner none'; banner.innerHTML=`${esc(d.system||'No system')}<small>honk (discovery scanner) to reveal bodies</small>`; }
+
+  const vb = d.bodies.filter(b=>b.value).length;
+  $('sysStats').innerHTML = d.scanned ?
+    `<span class="tchip">bodies <b>${d.scanned}</b>${d.body_count?'/'+d.body_count:''}</span>`+
+    `<span class="tchip">value <b>${cr(d.total_value)}</b> cr</span>`+
+    `<span class="tchip">landable <b>${d.bodies.filter(b=>b.landable).length}</b></span>`+
+    `<span class="tchip">bio <b>${d.bodies.filter(b=>b.bio_signals).length}</b></span>` : '';
+
+  // highlights strip
+  const hc=$('sysHiCard');
+  if((d.highlights||[]).length){
+    hc.style.display='block';
+    $('sysHighlights').innerHTML=d.highlights.map(h=>{
+      const short=(h.name||'').replace(new RegExp('^'+(d.system||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*'),'')||h.name;
+      return `<div class="g-mod" style="cursor:default"><span class="grp">${h.tags.map(esc).join(' · ')||'high value'}${h.mapped?' · mapped':''}</span>`+
+        `<span class="sys-disc c-${h.category}" style="display:inline-block;vertical-align:middle;margin-right:.35rem"></span>${esc(short)} `+
+        `<b style="color:var(--green)">${cr(h.value)}</b>${h.landable?' <span class="sb land">LAND</span>':''}</div>`;
+    }).join('');
+  } else hc.style.display='none';
+
+  if(!d.bodies.length){ $('sysBodies').innerHTML='<div class="muted" style="font-size:.85rem">No bodies scanned yet — run the discovery scanner (honk) and FSS/DSS bodies to populate the scan.</div>'; return; }
+  $('sysBodies').innerHTML = d.bodies.map(b=>{
+    const shortName = (b.name||'').replace(new RegExp('^'+(d.system||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\s*'),'') || b.name;
+    const badges = [
+      b.discovered===false?'<span class="sb disc">NEW</span>':'',
+      b.mapped?'<span class="sb map">MAPPED</span>':'',
+      b.terraformable?'<span class="sb terra">TERRA</span>':'',
+      b.landable?'<span class="sb land">LAND</span>':'',
+      b.bio_signals?`<span class="sb bio">BIO ${b.bio_signals}</span>`:'',
+      b.rings?'<span class="sb ring">◍ RING</span>':''
+    ].join('');
+    const det = sysOpen.has(b.id) ? `<div class="sys-detail open">`+
+      [b.atmosphere?`Atmosphere: <b>${esc(b.atmosphere)}</b>`:'',
+       b.volcanism?`Volcanism: <b>${esc(b.volcanism)}</b>`:'',
+       b.gravity!=null?`Gravity: <b>${sysNum(b.gravity,'g',2)}</b>`:'',
+       b.temperature!=null?`Temp: <b>${sysNum(b.temperature,'K')}</b>`:'',
+       b.mass!=null?`Mass: <b>${sysNum(b.mass,b.star?' M☉':' Mⴲ',2)}</b>`:''].filter(Boolean).join(' · ')+`</div>` : '';
+    return `<div class="sys-body" style="padding-left:${.3+b.depth*1.3}rem" onclick="sysToggleBody(${b.id})">`+
+      `<span class="sys-disc c-${b.category}"></span>`+
+      `<span class="bn">${esc(shortName)} <small>${esc(b.kind)}</small></span>`+
+      `<span class="sys-badges">${badges}</span>`+
+      `<span class="bd">${b.distance_ls!=null?Math.round(b.distance_ls).toLocaleString()+' ls':''}</span>`+
+      `<span class="bv">${b.value?cr(b.value):''}</span></div>`+det;
+  }).join('');
+}
+
+/* ---- engineering materials ---- */
+const EM_COL={orange:'var(--orange)',gold:'var(--gold)',cyan:'var(--cyan)'};
+$('emTradersBtn').addEventListener('click', async()=>{
+  $('emTradersStatus').textContent='◷ searching Spansh…';
+  try{ await fetch('/api/engmat/traders',{method:'POST'}); }catch(e){}
+  for(let i=0;i<25;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/engmat'); renderTraders(d.traders); if((d.traders||{}).status!=='searching') break; }
+});
+function traderGroup(title,rows,col){
+  if(!rows||!rows.length) return `<div class="matchip" style="opacity:.6">${title}: none in range</div>`;
+  return `<div style="margin-bottom:.5rem"><div class="sw-eyebrow" style="color:${col}">${title}</div>`+
+    rows.map(s=>`<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.station)} <small>/ ${esc(s.system)} · ${esc(s.economy||'')}</small></span>`+
+    `<span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''}${s.large_pad?' · L':''}</span>`+
+    `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉</button></div>`).join('')+'</div>';
+}
+function renderTraders(t){
+  if(!t) return;
+  const st=$('emTradersStatus');
+  if(t.status==='searching'){ st.textContent='◷ searching Spansh…'; return; }
+  if(t.status==='error'){ st.textContent='⚠ '+t.error; return; }
+  if(t.status==='ready'){
+    st.textContent='from '+(t.reference||'?');
+    const r=t.results||{};
+    $('emTraders').innerHTML = traderGroup('Raw trader',r.raw,EM_COL.orange)+traderGroup('Manufactured trader',r.manufactured,EM_COL.gold)+traderGroup('Encoded trader',r.encoded,EM_COL.cyan);
+  }
+}
+let _emLookupT=null;
+$('emSearch').addEventListener('input', e=>{
+  clearTimeout(_emLookupT);
+  const q=e.target.value.trim();
+  _emLookupT=setTimeout(async()=>{
+    if(q.length<2){ $('emLookupResults').innerHTML=''; return; }
+    let res; try{ res=await jget('/api/engmat/lookup?q='+encodeURIComponent(q)); }catch(err){ return; }
+    if(!res.length){ $('emLookupResults').innerHTML='<div class="muted" style="font-size:.82rem">No material or commodity matches that.</div>'; return; }
+    $('emLookupResults').innerHTML = res.map(m=>{
+      const col = m.commodity?'var(--orange)':(EM_COL[({Raw:'orange',Manufactured:'gold',Encoded:'cyan'})[m.category]]||'var(--gold)');
+      const methods = m.methods.length?('<b>'+m.methods.map(esc).join('</b>, <b>')+'</b>'):'';
+      const sites = (m.sites||[]).map(s=>`<button class="copybtn" onclick="copySys('${esc(s.system)}')" title="${esc(s.system)}">⧉ ${esc(s.system)}</button>`).join(' ');
+      return `<div class="sw-mod"><span class="mn"><b style="color:${col}">${esc(m.name)}</b> <span class="matchip" style="padding:.05rem .4rem">${esc(m.category)}</span></span></div>`+
+        `<div class="act" style="padding-left:.2rem"><span class="txt" style="font-size:.82rem"><span class="muted">${esc(m.where)}</span>${methods?' — '+methods:''} ${sites}</span></div>`;
+    }).join('');
+  },250);
+});
+
+function invFill(st){ return st==='full'?'var(--gold)':st==='high'?'var(--orange)':st==='empty'?'transparent':'var(--green)'; }
+function renderInventory(){
+  const inv=window._invData; if(!inv) return;
+  const filt=($('invFilter').value||'').trim().toLowerCase(), hideEmpty=$('invHideEmpty').checked, sum=inv.summary||{};
+  $('invSummary').innerHTML=['Raw','Manufactured','Encoded'].map(c=>`${c[0]}: <b>${(sum[c]||{}).held||0}</b>/${(sum[c]||{}).types||0}${(sum[c]||{}).full?` <span style="color:var(--gold)">·${sum[c].full} full</span>`:''}`).join(' &nbsp; ');
+  $('invGrid').innerHTML=['Raw','Manufactured','Encoded'].map(cat=>{
+    let items=(inv.groups[cat]||[]);
+    if(hideEmpty) items=items.filter(i=>i.count>0);
+    if(filt) items=items.filter(i=>i.name.toLowerCase().includes(filt));
+    const rows=items.map(i=>`<div class="inv-row ${i.status}"><span class="inv-g g${i.grade}">G${i.grade}</span>`+
+      `<span class="nm">${esc(i.name)}</span>`+
+      `<span class="inv-bar"><div style="width:${Math.min(100,Math.round(i.pct*100))}%;background:${invFill(i.status)}"></div></span>`+
+      `<span class="ct">${i.count}/${i.cap}</span></div>`).join('') || '<div class="muted" style="font-size:.76rem;padding:.3rem">none</div>';
+    return `<div class="inv-col"><div class="ceyebrow">${cat} <span class="muted" style="font-weight:400;text-transform:none">${(sum[cat]||{}).total||0} total</span></div><div class="inv-rows">${rows}</div></div>`;
+  }).join('');
+}
+$('invFilter').addEventListener('input', renderInventory);
+$('invHideEmpty').addEventListener('change', renderInventory);
+
+async function engmatTick(){
+  let d;
+  try{ d=await jget('/api/engmat'); }catch(e){ return; }
+  window._invData=d.inventory; renderInventory();
+  const c=d.materials||{};
+  const chip=(k,lbl,col)=>`<span class="matchip">${lbl} <b style="color:${col}">${(c[k]||{}).total||0}</b> <span class="muted">(${(c[k]||{}).types||0} types)</span></span>`;
+  $('emCounts').innerHTML = chip('raw','Raw',EM_COL.orange)+chip('manufactured','Manufactured',EM_COL.gold)+chip('encoded','Encoded',EM_COL.cyan);
+  $('emTraderInfo').textContent = d.trader_info||'';
+  renderTraders(d.traders);
+  // farming guide (render once)
+  if(!$('emGuide').dataset.built && d.guide){
+    $('emGuide').dataset.built='1';
+    $('emGuide').innerHTML = ['raw','manufactured','encoded'].map(k=>{
+      const g=d.guide[k]; if(!g) return '';
+      const col=EM_COL[g.color]||'var(--gold)';
+      const methods=g.methods.map(m=>`<div class="act" style="align-items:flex-start"><span class="mk" style="color:${col}">▸</span><span class="txt" style="font-size:.85rem"><b>${esc(m.name)}</b> — <span class="muted">${esc(m.detail)}</span></span></div>`).join('');
+      const sites=(g.sites||[]).map(s=>`<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.system)} <small>${esc(s.body||'')} — ${esc(s.note||'')}</small></span><button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉ copy</button></div>`).join('');
+      return `<div class="card"><div class="sw-eyebrow" style="color:${col};font-size:.9rem">${esc(g.label)}</div>`+
+        `<div class="muted" style="font-size:.8rem;margin-bottom:.4rem">${esc(g.desc)}</div>${methods}`+
+        (sites?`<div class="sw-eyebrow" style="margin-top:.5rem">Known farming sites</div>${sites}`:'')+`</div>`;
+    }).join('');
+  }
+}
+
+/* ---- community goals ---- */
+function cgLeft(expiry){
+  const ms=new Date(expiry)-Date.now();
+  if(isNaN(ms)) return '';
+  if(ms<=0) return 'ended';
+  const d=Math.floor(ms/864e5), h=Math.floor(ms%864e5/36e5), m=Math.floor(ms%36e5/6e4);
+  return (d?d+'d ':'')+((h||d)?h+'h ':'')+m+'m left';
+}
+$('cgInaraSave').addEventListener('click', async()=>{
+  const key=$('cgInaraKey').value.trim();
+  $('cgInaraStatus').textContent='◷ connecting to INARA…';
+  try{ await fetch('/api/cg/inara-key',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key})}); }catch(e){}
+  $('cgInaraKey').value='';
+  setTimeout(cgTick, 800);
+});
+function renderInaraStatus(s){
+  const el=$('cgInaraStatus');
+  if(!s.inara_configured){ el.innerHTML='<span class="muted">Using <b>journal</b> data (updates when you check a CG board). Add an INARA API key for an always-live feed with objectives &amp; rewards:</span>'; return; }
+  if(s.inara_status==='error'){ el.innerHTML=`<span style="color:#ff6a5a">🔴 INARA error: ${esc(s.inara_error||'check your key')}</span> <span class="muted">— falling back to journal.</span>`; return; }
+  if(s.inara_status==='fetching' && s.source!=='INARA'){ el.innerHTML='<span class="muted">◷ INARA connecting…</span>'; return; }
+  el.innerHTML='<span style="color:var(--green)">🟢 INARA live feed connected.</span> <span class="muted">Re-enter a key to change, or blank to remove.</span>';
+}
+async function cgTick(){
+  let s; try{ s=await jget('/api/cg'); }catch(e){ return; }
+  renderInaraStatus(s);
+  const srcTxt = s.source==='INARA' ? 'Live via INARA' : 'From your journal';
+  $('cgUpdated').innerHTML = s.updated ? (`${srcTxt} · updated ${new Date(s.updated).toLocaleString()}`+(s.source==='journal'?' — <i>dock at a CG board to refresh</i>':'')) : '';
+  if(!s.goals.length){ $('cgGoals').innerHTML='<div class="card"><span class="muted">No active Community Goals'+(s.source==='journal'?' seen yet — open a CG / mission board in-game.':'.')+'</span></div>'; return; }
+  $('cgGoals').innerHTML = s.goals.map(g=>{
+    const left=cgLeft(g.expiry), urgent=(new Date(g.expiry)-Date.now())<864e5;
+    const standing = g.your_contribution ? `Your contribution: <b>${cr(g.your_contribution)}</b> · top ${g.percentile}%${g.in_top_rank?' · <b style="color:var(--gold)">★ TOP RANK</b>':''}` : '<span class="muted">You haven\'t contributed to this one yet.</span>';
+    return `<div class="card"><div class="sw-shipname" style="font-size:1.05rem">${esc(g.title)}${g.war_zone?' <span class="bdg FOOTFALL">WAR</span>':''}</div>`+
+      `<div class="muted" style="font-size:.85rem;margin:.2rem 0 .5rem">${esc(g.station)} · ${esc(g.system)} <button class="copybtn" onclick="copySys('${esc(g.system)}')">⧉ copy</button></div>`+
+      (g.objective?`<div style="font-size:.85rem;margin-bottom:.5rem">${esc(g.objective)}</div>`:'')+
+      `<div class="matbar">`+
+        `<span class="matchip" style="border-color:${urgent?'var(--orange)':'var(--line)'}">⏳ <b style="color:${urgent?'var(--orange)':'var(--gold)'}">${left}</b></span>`+
+        `<span class="matchip">tier <b>${esc(g.tier||'?')}</b> / ${esc(g.top_tier||'?')}</span>`+
+        `<span class="matchip">contributors <b>${(g.contributors||0).toLocaleString()}</b></span>`+
+        (g.bonus?`<span class="matchip">bonus <b>${cr(g.bonus)}</b> cr</span>`:'')+
+        (g.complete?'<span class="matchip" style="color:var(--green)">✓ COMPLETE</span>':'')+
+      `</div>`+
+      (g.reward_text?`<div class="muted" style="font-size:.78rem;margin-top:.4rem">🎁 ${esc(g.reward_text)}</div>`:'')+
+      `<div style="font-size:.85rem;margin-top:.4rem">${standing}</div></div>`;
+  }).join('');
+}
+
+/* ---- colonization ---- */
+window.colSource = async c => { try{ await fetch('/api/colony/source',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commodity:c})}); }catch(e){} colonyTick(); };
+$('colFind').addEventListener('click', async()=>{
+  $('colCandStatus').textContent='◷ searching Spansh…';
+  try{ await fetch('/api/colony/candidates',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({radius:parseFloat($('colRadius').value)||40})}); }catch(e){}
+  for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/colony'); if((d.candidates||{}).status!=='searching'){ renderColony(d); break; } }
+});
+function heatColor(t){ // 0..1 -> blue → green → gold → orange
+  const h = 200 - 180*Math.min(1,t);
+  return `hsl(${h},75%,${45+t*15}%)`;
+}
+function renderHeatmap(cand){
+  const sys=(cand.systems||[]).filter(s=>s.x!=null);
+  if(sys.length<2) return '<div class="muted" style="font-size:.82rem">Not enough coordinate data for a map.</div>';
+  const zof=s=>(s.z!=null?s.z:s.y);
+  const ref = (cand.ref_xyz && cand.ref_xyz[0]!=null) ? cand.ref_xyz : null;
+  const cx = ref?ref[0]:sys.reduce((a,s)=>a+s.x,0)/sys.length;
+  const cz = ref?(ref[2]!=null?ref[2]:ref[1]):sys.reduce((a,s)=>a+zof(s),0)/sys.length;
+  const pts=sys.map(s=>({s,dx:s.x-cx,dz:zof(s)-cz}));
+  const maxr=Math.max(1,...pts.map(p=>Math.hypot(p.dx,p.dz)));
+  const S=300,c=S/2,R=125, maxScore=Math.max(1,...sys.map(s=>s.score));
+  const dots=pts.map(p=>{
+    const px=c+p.dx/maxr*R, py=c-p.dz/maxr*R, t=p.s.score/maxScore;
+    return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${(3+t*7).toFixed(1)}" fill="${heatColor(t)}" fill-opacity="0.85" stroke="#0a0b08" stroke-width="0.5" style="cursor:pointer" onclick="copySys('${esc(p.s.name)}')"><title>${esc(p.s.name)} · ${Math.round(p.s.distance_ly||0)} ly · ${p.s.bodies} bodies · score ${cr(p.s.score)}</title></circle>`;
+  }).join('');
+  return `<svg class="heatmap" width="${S}" height="${S}" viewBox="0 0 ${S} ${S}">`+
+    `<circle cx="${c}" cy="${c}" r="${R}" fill="none" stroke="var(--line)"/>`+
+    `<circle cx="${c}" cy="${c}" r="${R*0.5}" fill="none" stroke="var(--line)" stroke-dasharray="3 3"/>`+
+    `<line x1="${c}" y1="8" x2="${c}" y2="${S-8}" stroke="var(--line)" stroke-width="0.5"/>`+
+    `<line x1="8" y1="${c}" x2="${S-8}" y2="${c}" stroke="var(--line)" stroke-width="0.5"/>`+
+    dots+
+    `<circle cx="${c}" cy="${c}" r="4.5" fill="var(--cyan)" stroke="#fff" stroke-width="1"><title>You (${esc(cand.reference||'')})</title></circle>`+
+    `<text x="${c+7}" y="${c-6}" fill="var(--cyan)" font-size="10">you</text>`+
+    `</svg>`;
+}
+function renderColony(d){
+  // construction
+  const c=d.construction, cc=$('colConstruction');
+  if(c){
+    const pct=Math.round((c.progress||0)*100);
+    const done=c.complete;
+    cc.innerHTML=`<div class="card"><div class="sw-eyebrow">Active construction</div>`+
+      `<div class="sw-shipname" style="font-size:1.05rem">${esc(c.station||'Construction site')} <small class="muted">/ ${esc(c.system||'')}</small> <button class="copybtn" onclick="copySys('${esc(c.system)}')">⧉ copy</button></div>`+
+      `<div class="col-res" style="border:none;padding-top:.4rem"><span class="rn">Overall ${done?'✓ complete':pct+'%'}</span><div class="pbar ${done?'done':''}"><div style="width:${pct}%"></div></div><span class="rq">${cr(c.total_provided)} / ${cr(c.total_required)} t</span></div>`+
+      `<div class="muted" style="font-size:.82rem;margin:.3rem 0">Still to haul: <b style="color:var(--gold)">${(c.total_remaining||0).toLocaleString()} t</b> across ${c.resources.filter(r=>r.remaining>0).length} commodities</div>`+
+      c.resources.map(r=>{
+        const p=Math.round(r.pct*100), rdone=r.remaining<=0;
+        const src = r.remaining>0?`<button class="skipbtn" onclick="colSource('${esc(r.name)}')">⌕ buy</button>`:'';
+        return `<div class="col-res"><span class="rn">${esc(r.name)}</span><div class="pbar ${rdone?'done':''}"><div style="width:${p}%"></div></div><span class="rq">${rdone?'done':(r.remaining.toLocaleString()+'t left')}</span>${src}</div>`;
+      }).join('')+`</div>`;
+  } else {
+    cc.innerHTML=`<div class="card"><div class="sw-eyebrow">Active construction</div><div class="muted" style="font-size:.85rem">No colonisation construction found in your recent journals. Claim a system and dock at its Construction Ship, and its material needs will track here.</div></div>`;
+  }
+  // sources
+  const srcs=Object.entries(d.sources||{}).filter(([,v])=>v.status!=='idle');
+  $('colSources').innerHTML = srcs.length ? '<div class="card"><div class="sw-eyebrow">Where to buy</div>'+srcs.map(([name,v])=>{
+    if(v.status==='searching') return `<div class="muted" style="font-size:.8rem">◷ finding ${esc(name)}…</div>`;
+    if(v.status==='error') return `<div class="muted" style="font-size:.8rem">${esc(name)}: ${esc(v.error)}</div>`;
+    if(!v.stops.length) return `<div class="muted" style="font-size:.8rem">${esc(name)}: no market found nearby.</div>`;
+    return `<div class="sw-eyebrow" style="color:var(--gold)">${esc(name)}</div>`+v.stops.map(s=>`<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.station)} <small>/ ${esc(s.system)}</small></span><span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''} · ${s.buy_price||'?'} cr · sup ${s.supply||'?'}</span><button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉</button></div>`).join('');
+  }).join('')+'</div>' : '';
+  // candidates + heatmap
+  const cand=d.candidates||{};
+  if(cand.status==='searching'){ $('colCandStatus').textContent='◷ searching…'; }
+  else if(cand.status==='error'){ $('colCandStatus').textContent='⚠ '+cand.error; }
+  else if(cand.status==='ready'){ $('colCandStatus').textContent=`${cand.systems.length} candidates near ${cand.reference||''}`; }
+  if(cand.status==='ready' && cand.systems.length){
+    $('colHeatmap').innerHTML = renderHeatmap(cand) + '<div class="heat-legend" style="margin-top:.3rem">worse <span class="bar" style="display:inline-block;vertical-align:middle"></span> better</div>';
+    $('colCandidates').innerHTML = '<div class="sw-eyebrow">Top spots</div>'+cand.systems.slice(0,10).map((s,i)=>
+      `<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="sys-disc" style="background:${heatColor(s.score/(cand.systems[0].score||1))}"></span>`+
+      `<span class="bn">${esc(s.name)} <small class="muted">${Math.round(s.distance_ly||0)} ly · ${s.bodies} bodies${s.why.length?' · '+esc(s.why.join(', ')):''}</small></span>`+
+      `<button class="copybtn" onclick="copySys('${esc(s.name)}')">⧉</button></div>`).join('');
+  }
+}
+async function colonyTick(){ try{ renderColony(await jget('/api/colony')); }catch(e){} }
+
+tick(); setInterval(tick, 1000);
+prefillCargo(); cargoTick(); setInterval(cargoTick, 1200);
+cgTick(); setInterval(cgTick, 10000);
+colonyTick(); setInterval(colonyTick, 4000);
+firstsTick(); setInterval(firstsTick, 1500);
+navTick(); setInterval(navTick, 1500);
+systemTick(); setInterval(systemTick, 1500);
+exoPrefill(); exoTick(); setInterval(exoTick, 2000);
+guardianTick(); setInterval(guardianTick, 3000);
+engmatTick(); setInterval(engmatTick, 3000);
+loadShips(); loadPresetList(); shipwrightTick(); setInterval(shipwrightTick, 2500);
+eddTick(); setInterval(eddTick, 15000);
+</script>
+</body>
+</html>

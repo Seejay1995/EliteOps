@@ -1,0 +1,115 @@
+{
+  "schema": "eliteops.shipbuild/1",
+  "name": "Caspian Exobiology Explorer",
+  "ship": "explorer_nx",
+  "hull_name": null,
+  "role": "Exobiology Explorer",
+  "notes": "",
+  "search": {
+    "referenceSystem": "",
+    "useCurrentSystem": true,
+    "radiusLy": 300,
+    "requireLargePad": true,
+    "includeFleetCarriers": false
+  },
+  "rollProfile": {
+    "1": 1,
+    "2": 2,
+    "3": 4,
+    "4": 6,
+    "5": 10
+  },
+  "modules": [
+    {
+      "slot": null,
+      "category": "core",
+      "type": "Frame Shift Drive",
+      "grp": "fsd",
+      "class": 8,
+      "rating": "A",
+      "blueprint": "Increased Range",
+      "grade": 5,
+      "experimental": "Mass Manager",
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    },
+    {
+      "slot": null,
+      "category": "core",
+      "type": "Thrusters",
+      "grp": "t",
+      "class": 7,
+      "rating": "A",
+      "blueprint": "Dirty",
+      "grade": 5,
+      "experimental": "Drag Drives",
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    },
+    {
+      "slot": null,
+      "category": "core",
+      "type": "Power Plant",
+      "grp": "pp",
+      "class": 6,
+      "rating": "A",
+      "blueprint": "Armoured",
+      "grade": 5,
+      "experimental": "Thermal Spread",
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    },
+    {
+      "slot": null,
+      "category": "optional",
+      "type": "Fuel Scoop",
+      "grp": "fs",
+      "class": 7,
+      "rating": "A",
+      "blueprint": null,
+      "grade": null,
+      "experimental": null,
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    },
+    {
+      "slot": null,
+      "category": "optional",
+      "type": "Guardian FSD Booster",
+      "grp": "gfsb",
+      "class": 5,
+      "rating": "H",
+      "blueprint": null,
+      "grade": null,
+      "experimental": null,
+      "quantity": 1,
+      "acquisition": "GuardianTechBroker"
+    },
+    {
+      "slot": null,
+      "category": "optional",
+      "type": "Repair Limpet Controller",
+      "grp": "rpl",
+      "class": 3,
+      "rating": "D",
+      "blueprint": "Lightweight",
+      "grade": 5,
+      "experimental": null,
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    },
+    {
+      "slot": null,
+      "category": "optional",
+      "type": "Surface Scanner",
+      "grp": "ss",
+      "class": 1,
+      "rating": "I",
+      "blueprint": "Expanded Probe Radius",
+      "grade": 5,
+      "experimental": null,
+      "quantity": 1,
+      "acquisition": "StandardOutfitting"
+    }
+  ]
+}
