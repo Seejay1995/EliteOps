@@ -454,6 +454,43 @@ def riches_route(*, from_system: str, jump_range: float, radius: float = 100.0,
             "systems": systems, "total_value": grand_total}
 
 
+def find_commodity_sales(reference_system: str, commodity: str, amount: int, *,
+                         large_pad_only: bool = True, limit: int = 6,
+                         timeout: float = 25.0) -> list[dict[str, Any]]:
+    """Where to SELL ``commodity`` — best sell price first. Uses Spansh's
+    /commodity/sell/{system}/{commodity}/{amount} endpoint (mirror of the buy finder)."""
+    path = ("/commodity/sell/" + urllib.parse.quote(str(reference_system)) + "/"
+            + urllib.parse.quote(str(commodity)) + "/" + str(int(max(1, amount))))
+    data = _get(path, timeout=timeout)
+    stations = data.get("results") if isinstance(data, dict) else data
+    if not isinstance(stations, list):
+        return []
+    key = str(commodity).casefold()
+    out = []
+    for st in stations:
+        if not isinstance(st, dict):
+            continue
+        if large_pad_only and not st.get("has_large_pad"):
+            continue
+        if "Carrier" in str(st.get("type") or ""):
+            continue
+        sell_price = demand = None
+        for entry in st.get("market") or []:
+            if str(entry.get("commodity", "")).casefold() == key:
+                sell_price = entry.get("sell_price")
+                demand = entry.get("demand")
+                break
+        if not sell_price:
+            continue
+        out.append({"station": st.get("name"), "system": st.get("system_name"),
+                    "distance_ly": st.get("distance"), "distance_ls": st.get("distance_to_arrival"),
+                    "sell_price": sell_price, "demand": demand,
+                    "large_pad": st.get("has_large_pad"),
+                    "market_updated_at": st.get("market_updated_at")})
+    out.sort(key=lambda x: -(x["sell_price"] or 0))
+    return out[:limit]
+
+
 def generate_exobiology(
     *,
     from_system: str,

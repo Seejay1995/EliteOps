@@ -27,6 +27,7 @@ from .exo_engine import ExoEngine
 from .expedition_engine import ExpeditionEngine
 from .firsts_engine import FirstsEngine
 from .guardian_engine import GuardianEngine
+from .mining_engine import MiningEngine
 from .nav_engine import NavEngine
 from .shipwright_engine import ShipwrightEngine
 from .state import EliteState
@@ -96,6 +97,7 @@ class EliteOps:
         self.engmat = EngMatEngine(self.state)
         self.cg = CGEngine(self.state)
         self.colony = ColonyEngine(self.state)
+        self.mining = MiningEngine(self.state)
         self.system = SystemEngine(self.state)
         self.shipwright = ShipwrightEngine(self.state)
         self.edd = EddBridge()
@@ -184,6 +186,9 @@ class EliteOps:
                     return
                 if path == "/api/system":
                     self._send(200, json.dumps(app.system.snapshot()))
+                    return
+                if path == "/api/mining":
+                    self._send(200, json.dumps(app.mining.snapshot()))
                     return
                 if path == "/api/engmat":
                     self._send(200, json.dumps(app.engmat.snapshot()))
@@ -299,6 +304,14 @@ class EliteOps:
                 if path == "/api/guardian/broker":
                     app.guardian.find_broker()
                     self._send(200, json.dumps(app.guardian.snapshot()))
+                    return
+                if path == "/api/mining/reset":
+                    app.mining.reset_session()
+                    self._send(200, json.dumps(app.mining.snapshot()))
+                    return
+                if path == "/api/mining/sell":
+                    app.mining.find_sales(str(body.get("commodity") or ""))
+                    self._send(200, json.dumps(app.mining.snapshot()))
                     return
                 if path == "/api/engmat/traders":
                     app.engmat.find_traders()

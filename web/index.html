@@ -241,6 +241,35 @@
     border-radius:.4rem;padding:.5rem;font-family:inherit;font-size:.78rem;display:none}
   .tblwrap-x{overflow-x:auto}
 
+  /* mining cockpit HUD */
+  .hud{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.8rem}
+  .hud .card{margin:0}
+  .hud-lbl{text-transform:uppercase;letter-spacing:.08em;font-size:.66rem;color:var(--dim);margin-bottom:.4rem}
+  .hud-big{font-size:2.4rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .hud-sub{color:var(--dim);font-size:.78rem;margin-top:.25rem}
+  .gauge{height:.7rem;border-radius:.4rem;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin-top:.5rem}
+  .gauge > i{display:block;height:100%;border-radius:.4rem;transition:width .4s,background .3s}
+  .content-badge{display:inline-block;font-weight:800;letter-spacing:.05em;border-radius:.4rem;padding:.15rem .6rem;font-size:.9rem}
+  .content-High{background:rgba(87,217,87,.15);color:var(--green);border:1px solid var(--green)}
+  .content-Medium{background:rgba(255,176,0,.12);color:var(--gold);border:1px solid var(--gold)}
+  .content-Low{background:var(--panel2);color:var(--dim);border:1px solid var(--line)}
+  .mat-row{display:flex;align-items:center;gap:.5rem;margin:.35rem 0}
+  .mat-row .mn{min-width:8.5rem;font-size:.82rem}
+  .mat-row .mbar{flex:1;height:.85rem;background:var(--bg);border:1px solid var(--line);border-radius:.3rem;overflow:hidden}
+  .mat-row .mbar > i{display:block;height:100%}
+  .mat-row .mp{width:2.8rem;text-align:right;font-size:.78rem;font-variant-numeric:tabular-nums}
+  .mat-row.val .mn{color:var(--gold);font-weight:700}
+  .ore-row{display:flex;align-items:center;gap:.5rem;padding:.25rem .1rem;border-bottom:1px solid var(--line);font-size:.85rem}
+  .ore-row .ot{margin-left:auto;font-variant-numeric:tabular-nums}
+  .tier-hot{color:var(--orange);font-weight:700} .tier-good{color:var(--gold)}
+  .tier-fuel{color:var(--cyan)} .tier-common{color:var(--dim)}
+  .core-flag{color:var(--cyan);font-weight:800}
+  .tip{display:flex;gap:.5rem;align-items:flex-start;font-size:.86rem;padding:.4rem .2rem;border-bottom:1px solid var(--line)}
+  .tip .ti{color:var(--gold)}
+  .primer{font-size:.82rem;color:var(--dim);line-height:1.5}
+  .primer b{color:var(--text)}
+  details.primer-d summary{cursor:pointer;color:var(--gold);font-size:.85rem;padding:.2rem 0}
+
   @media (max-width:680px){
     .body{grid-template-columns:1fr;grid-template-rows:1fr auto}
     nav{flex-direction:row;order:2;border-right:none;border-top:1px solid var(--line);
@@ -276,6 +305,7 @@
       <div class="tab" data-view="exo"><span class="i">🧬</span><span>Exo</span></div>
       <div class="tab" data-view="guardian"><span class="i">🔷</span><span>Guardian</span></div>
       <div class="tab" data-view="engmat"><span class="i">🧪</span><span>Materials</span></div>
+      <div class="tab" data-view="mining"><span class="i">⛏️</span><span>Mining</span></div>
       <div class="tab" data-view="cg"><span class="i">🏆</span><span>Goals</span></div>
       <div class="tab" data-view="colony"><span class="i">🏗️</span><span>Colony</span></div>
       <div class="tab" data-view="firsts"><span class="i">★</span><span>Firsts</span></div>
@@ -579,6 +609,53 @@
           <div id="emTraders" style="margin-top:.6rem"></div>
         </div>
         <div id="emGuide"></div>
+      </section>
+      <section class="view" id="view-mining">
+        <h2>Mining HUD</h2>
+        <div class="banner none" id="mineTip" style="margin-bottom:.8rem"></div>
+        <div class="hud" style="margin-bottom:.8rem">
+          <div class="card">
+            <div class="hud-lbl">Limpets</div>
+            <div class="hud-big" id="mLimpets">–</div>
+            <div class="gauge"><i id="mLimpetsBar" style="width:0%"></i></div>
+            <div class="hud-sub" id="mLimpetsSub"></div>
+          </div>
+          <div class="card">
+            <div class="hud-lbl">Cargo hold</div>
+            <div class="hud-big"><span id="mUsed">0</span><span class="muted" style="font-size:1.1rem" id="mCap"></span></div>
+            <div class="gauge"><i id="mCargoBar" style="width:0%"></i></div>
+            <div class="hud-sub" id="mCargoSub">ore in hold</div>
+          </div>
+          <div class="card">
+            <div class="hud-lbl">Session</div>
+            <div class="hud-big"><span id="mTons">0</span><span class="muted" style="font-size:1.1rem">t refined</span></div>
+            <div class="hud-sub" id="mSessionSub"></div>
+            <button class="btn ghost" id="mReset" style="padding:.3rem .7rem;margin-top:.5rem;font-size:.78rem">Reset session</button>
+          </div>
+        </div>
+        <div class="hud">
+          <div class="card">
+            <div class="hud-lbl">Last asteroid prospected</div>
+            <div id="mAsteroid"><span class="muted" style="font-size:.85rem">Fire a Prospector Limpet at an asteroid to scan it.</span></div>
+          </div>
+          <div class="card">
+            <div class="hud-lbl">Ore in hold</div>
+            <div id="mOre"><span class="muted" style="font-size:.85rem">Empty.</span></div>
+            <div id="mSell" style="margin-top:.5rem"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:.8rem">
+          <div class="hud-lbl">Coaching</div>
+          <div id="mTips"></div>
+          <details class="primer-d" style="margin-top:.6rem">
+            <summary>New to mining? Read this ↓</summary>
+            <div class="primer" style="margin-top:.5rem">
+              <p><b>Laser mining</b> (easiest to start): fit <b>Mining Lasers</b> (hardpoints), a <b>Refinery</b>, a <b>Prospector Limpet Controller</b>, a <b>Collector Limpet Controller</b>, and <b>Cargo Racks</b> + <b>Limpets</b>. Fly to a ring, fire a <b>prospector limpet</b> at an asteroid to see its content, shoot <b>High</b>-content rocks with the lasers, and let <b>collector limpets</b> auto-scoop the chunks into your refinery.</p>
+              <p><b>Core mining</b> (bigger payouts, e.g. Void Opals): also fit a <b>Pulse Wave Analyser</b> (utility) to spot glowing asteroids, a <b>Seismic Charge Launcher</b>, and an <b>Abrasion Blaster</b>. Find a motherlode asteroid, shoot the surface deposits, drop seismic charges in the blue fissures to build the ring to optimal, then detonate to crack it and collect the gems.</p>
+              <p><b>Find a hotspot</b>: honk + DSS-map a ringed planet to reveal <b>hotspot</b> rings for specific ores. <b>Sell</b> mining commodities at high-demand stations — use the “find best sell price” button when your hold fills up.</p>
+            </div>
+          </details>
+        </div>
       </section>
       <section class="view" id="view-firsts">
         <h2>Firsts Radar</h2>
@@ -1447,6 +1524,68 @@ async function expTick(){
   }).join('')+'</div>';
 }
 
+/* ---- mining HUD ---- */
+const TIERC={hot:'var(--orange)',good:'var(--gold)',fuel:'var(--cyan)',common:'var(--dim)'};
+function fmtDur(s){ s=s||0; const h=Math.floor(s/3600),m=Math.floor(s%3600/60); return h?`${h}h ${m}m`:`${m}m`; }
+$('mReset').addEventListener('click', async()=>{ await fetch('/api/mining/reset',{method:'POST'}); miningTick(); });
+window.mFindSell = async ore => { await fetch('/api/mining/sell',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({commodity:ore})});
+  for(let i=0;i<15;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/mining'); renderSell(d.sell); if((d.sell||{}).status!=='searching') break; } };
+function renderSell(s){
+  const el=$('mSell'); if(!s || s.status==='idle'){ el.innerHTML=''; return; }
+  if(s.status==='searching'){ el.innerHTML=`<div class="muted" style="font-size:.8rem">◷ finding best price for ${esc(s.commodity)}…</div>`; return; }
+  if(s.status==='error'){ el.innerHTML=`<div class="muted" style="font-size:.8rem;color:#ff6a5a">⚠ ${esc(s.error)}</div>`; return; }
+  if(!s.stops||!s.stops.length){ el.innerHTML=`<div class="muted" style="font-size:.8rem">No buyers found nearby for ${esc(s.commodity)}.</div>`; return; }
+  el.innerHTML = `<div class="hud-lbl">Best sell — ${esc(s.commodity)}</div>`+s.stops.slice(0,4).map(st=>
+    `<div class="ore-row"><span>${esc(st.station)} <small class="muted">/ ${esc(st.system)} · ${st.distance_ly!=null?Math.round(st.distance_ly)+' ly':''}</small></span>`+
+    `<span class="ot tier-good">${(st.sell_price||0).toLocaleString()} cr</span>`+
+    `<button class="copybtn" onclick="copySys('${esc(st.system)}')">⧉</button></div>`).join('');
+}
+async function miningTick(){
+  let d; try{ d=await jget('/api/mining'); }catch(e){ return; }
+  const c=d.cargo;
+  // limpets
+  $('mLimpets').textContent=c.limpets;
+  const lp=Math.min(100,c.limpets/40*100), lcol=c.limpets===0?'#ff6a5a':c.limpets<6?'var(--gold)':'var(--green)';
+  const lb=$('mLimpetsBar'); lb.style.width=lp+'%'; lb.style.background=lcol;
+  $('mLimpets').style.color=lcol;
+  $('mLimpetsSub').textContent=`${d.session.prospectors} prospector · ${d.session.collectors} collector fired`;
+  // cargo
+  $('mUsed').textContent=c.used; $('mCap').textContent=c.capacity?(' / '+c.capacity+'t'):'t';
+  const cp=c.capacity?Math.min(100,c.used/c.capacity*100):0;
+  const cb=$('mCargoBar'); cb.style.width=cp+'%'; cb.style.background=cp>=100?'#ff6a5a':cp>85?'var(--gold)':'var(--cyan)';
+  $('mCargoSub').textContent=`${c.ore_tons}t ore · ${c.ore.length} types`;
+  // session
+  $('mTons').textContent=d.session.total_tons;
+  const ct=d.session.content;
+  $('mSessionSub').innerHTML=`${d.session.prospected} prospected (<b style="color:var(--green)">${ct.High}</b>H/<b style="color:var(--gold)">${ct.Medium}</b>M/${ct.Low}L)`+(d.session.cracked?` · ${d.session.cracked} cracked`:'')+(d.session.active?` · ${fmtDur(d.session.elapsed)}`:'');
+  // last asteroid
+  const a=d.last_asteroid;
+  $('mAsteroid').innerHTML = a ? (
+    `<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.5rem"><span class="content-badge content-${a.content}">${esc(a.content)}</span>`+
+    (a.remaining!=null?`<span class="muted" style="font-size:.8rem">${Math.round(a.remaining)}% remaining</span>`:'')+
+    (a.motherlode?`<span class="core-flag" style="margin-left:auto">💎 CORE: ${esc(a.motherlode)}</span>`:'')+`</div>`+
+    a.materials.map(m=>`<div class="mat-row ${m.valuable?'val':''}"><span class="mn">${esc(m.name)}</span>`+
+      `<span class="mbar"><i style="width:${Math.min(100,m.proportion)}%;background:${m.valuable?TIERC[m.tier]||'var(--gold)':'var(--dim)'}"></i></span>`+
+      `<span class="mp">${m.proportion}%</span></div>`).join('')
+  ) : '<span class="muted" style="font-size:.85rem">Fire a Prospector Limpet at an asteroid to scan it.</span>';
+  // ore in hold
+  $('mOre').innerHTML = c.ore.length ? c.ore.map(o=>
+    `<div class="ore-row"><span class="tier-${o.tier||'common'}">${esc(o.name)}</span>`+
+    `<span class="muted" style="font-size:.7rem">${o.tier==='hot'?'★ high value':o.tier==='good'?'valuable':o.tier==='fuel'?'fuel':''}</span>`+
+    `<span class="ot">${o.count}t</span>`+
+    (o.valuable?`<button class="skipbtn" onclick="mFindSell('${esc(o.name)}')">sell?</button>`:'')+`</div>`).join('')
+    + (c.other.length?`<div class="muted" style="font-size:.72rem;margin-top:.4rem">other: ${c.other.map(o=>esc(o.name)+' '+o.count+'t').join(', ')}</div>`:'')
+    : '<span class="muted" style="font-size:.85rem">Hold is empty — go mine some rocks!</span>';
+  renderSell(d.sell);
+  // refined breakdown + tips
+  const refined = d.session.refined.length ? '<div style="margin-top:.4rem" class="hud-sub">'+d.session.refined.map(r=>`<span class="tier-${r.tier||'common'}">${esc(r.name)} ${r.tons}t</span>`).join(' · ')+'</div>' : '';
+  $('mTips').innerHTML = d.tips.map(t=>`<div class="tip"><span class="ti">▸</span><span>${esc(t)}</span></div>`).join('')+refined;
+  // hero tip = most urgent
+  const b=$('mineTip');
+  b.className='banner '+(c.limpets===0||(c.capacity&&c.used>=c.capacity)?'some':'none');
+  b.innerHTML = d.tips[0]?`<span style="font-size:.95rem">${esc(d.tips[0])}</span>`:'';
+}
+
 /* ---- system scan ---- */
 const sysOpen = new Set();
 window.sysToggleBody = id => { if(sysOpen.has(id)) sysOpen.delete(id); else sysOpen.add(id); systemTick(); };
@@ -1722,6 +1861,7 @@ colonyTick(); setInterval(colonyTick, 4000);
 firstsTick(); setInterval(firstsTick, 1500);
 navTick(); setInterval(navTick, 1500);
 systemTick(); setInterval(systemTick, 1500);
+miningTick(); setInterval(miningTick, 1500);
 exoPrefill(); exoTick(); setInterval(exoTick, 2000);
 guardianTick(); setInterval(guardianTick, 3000);
 engmatTick(); setInterval(engmatTick, 3000);
