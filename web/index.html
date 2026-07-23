@@ -210,6 +210,12 @@
   .sys-detail{font-size:.78rem;color:var(--dim);padding:.3rem .3rem .5rem 2.3rem;border-bottom:1px solid var(--line);display:none}
   .sys-detail.open{display:block}
   .sys-detail b{color:var(--text);font-weight:600}
+  .sd-lbl{text-transform:uppercase;letter-spacing:.05em;font-size:.62rem;color:var(--dim);margin:.5rem 0 .25rem}
+  .comp-bar{display:flex;height:.7rem;border-radius:.3rem;overflow:hidden;border:1px solid var(--line)}
+  .comp-bar > span{display:block;height:100%}
+  .mat-grid{display:flex;flex-wrap:wrap;gap:.3rem}
+  .mchip{border:1px solid var(--line);border-radius:.35rem;padding:.1rem .4rem;font-size:.74rem;white-space:nowrap}
+  .sb.mat{color:var(--orange)} .sb.geo{color:#c8a0ff}
   /* body-type disc colors */
   .c-star{background:radial-gradient(circle at 35% 35%,#fff6c0,#ffb000)}
   .c-whitedwarf{background:radial-gradient(circle at 35% 35%,#fff,#9fd8ff)}
@@ -1589,6 +1595,45 @@ async function miningTick(){
 /* ---- system scan ---- */
 const sysOpen = new Set();
 window.sysToggleBody = id => { if(sysOpen.has(id)) sysOpen.delete(id); else sysOpen.add(id); systemTick(); };
+const GRADEC={1:'var(--dim)',2:'var(--text)',3:'var(--gold)',4:'var(--orange)'};
+function sysDetail(b){
+  const facts=[
+    b.terraform_state?`Terraform: <b>${esc(b.terraform_state)}</b>`:'',
+    b.atmosphere?`Atmosphere: <b>${esc(b.atmosphere)}</b>`:'',
+    b.volcanism?`Volcanism: <b>${esc(b.volcanism)}</b>`:'',
+    b.gravity!=null?`Gravity: <b>${sysNum(b.gravity,' g',2)}</b>`:'',
+    b.temperature!=null?`Temp: <b>${sysNum(b.temperature,' K')}</b>`:'',
+    b.surface_pressure!=null&&b.surface_pressure>0?(function(){const a=b.surface_pressure/101325;return `Pressure: <b>${a>=0.1?a.toFixed(2):a.toFixed(3)} atm</b>`;})():'',
+    b.mass!=null?`Mass: <b>${sysNum(b.mass,b.star?' M☉':' Mⴲ',2)}</b>`:'',
+    b.radius!=null?`Radius: <b>${sysNum(b.radius/1000,' km')}</b>`:'',
+  ].filter(Boolean).join(' · ');
+  let html=`<div class="sys-detail open">`;
+  if(facts) html+=`<div style="margin-bottom:.4rem">${facts}</div>`;
+  // composition bar (ice/rock/metal)
+  if(b.composition){
+    const c=b.composition, seg=(v,col,lbl)=>v>0?`<span style="background:${col};width:${v}%" title="${lbl} ${v}%"></span>`:'';
+    html+=`<div class="comp-bar">${seg(c.metal,'var(--gold)','Metal')}${seg(c.rock,'#9a8b6a','Rock')}${seg(c.ice,'#aee3ff','Ice')}</div>`+
+      `<div class="muted" style="font-size:.7rem;margin-bottom:.4rem">`+
+      [c.metal?`Metal ${c.metal}%`:'',c.rock?`Rock ${c.rock}%`:'',c.ice?`Ice ${c.ice}%`:''].filter(Boolean).join(' · ')+`</div>`;
+  }
+  // surface materials — the "can I farm mats here" panel
+  if(b.materials && b.materials.length){
+    html+=`<div class="sd-lbl">Surface materials ${b.landable?'<span class="sb land">land to collect</span>':'<span class="muted">(not landable)</span>'}</div>`;
+    html+='<div class="mat-grid">'+b.materials.map(m=>
+      `<div class="mchip" style="border-color:${GRADEC[m.grade]||'var(--line)'}"><span style="color:${GRADEC[m.grade]||'var(--dim)'}">${esc(m.name)}</span> ${m.percent}%${m.grade?` <small class="muted">G${m.grade}</small>`:''}</div>`).join('')+'</div>';
+  }
+  // atmosphere composition
+  if(b.atmosphere_composition && b.atmosphere_composition.length){
+    html+=`<div class="sd-lbl">Atmosphere</div><div class="muted" style="font-size:.76rem">`+
+      b.atmosphere_composition.map(a=>`${esc(a.name)} ${a.percent}%`).join(' · ')+`</div>`;
+  }
+  // rings
+  if(b.rings_detail && b.rings_detail.length){
+    html+=`<div class="sd-lbl">Rings${b.reserve_level?` · <b>${esc(b.reserve_level)}</b>`:''}</div>`;
+    html+=b.rings_detail.map(r=>`<div style="font-size:.76rem"><b>${esc(r.name)}</b> — ${esc(r.hint||r.ring_class)}</div>`).join('');
+  }
+  return html+'</div>';
+}
 function sysNum(v,suf,dp){ return v==null?'':(dp?(+v).toFixed(dp):Math.round(v).toLocaleString())+(suf||''); }
 async function systemTick(){
   let d;
@@ -1627,15 +1672,12 @@ async function systemTick(){
       b.mapped?'<span class="sb map">MAPPED</span>':'',
       b.terraformable?'<span class="sb terra">TERRA</span>':'',
       b.landable?'<span class="sb land">LAND</span>':'',
+      b.has_rare_mat?'<span class="sb mat">★ MATS</span>':'',
       b.bio_signals?`<span class="sb bio">BIO ${b.bio_signals}</span>`:'',
+      b.geo_signals?`<span class="sb geo">GEO ${b.geo_signals}</span>`:'',
       b.rings?'<span class="sb ring">◍ RING</span>':''
     ].join('');
-    const det = sysOpen.has(b.id) ? `<div class="sys-detail open">`+
-      [b.atmosphere?`Atmosphere: <b>${esc(b.atmosphere)}</b>`:'',
-       b.volcanism?`Volcanism: <b>${esc(b.volcanism)}</b>`:'',
-       b.gravity!=null?`Gravity: <b>${sysNum(b.gravity,'g',2)}</b>`:'',
-       b.temperature!=null?`Temp: <b>${sysNum(b.temperature,'K')}</b>`:'',
-       b.mass!=null?`Mass: <b>${sysNum(b.mass,b.star?' M☉':' Mⴲ',2)}</b>`:''].filter(Boolean).join(' · ')+`</div>` : '';
+    const det = sysOpen.has(b.id) ? sysDetail(b) : '';
     return `<div class="sys-body" style="padding-left:${.3+b.depth*1.3}rem" onclick="sysToggleBody(${b.id})">`+
       `<span class="sys-disc c-${b.category}"></span>`+
       `<span class="bn">${esc(shortName)} <small>${esc(b.kind)}</small></span>`+

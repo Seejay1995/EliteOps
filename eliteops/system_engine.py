@@ -17,6 +17,34 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))
 import firsts  # noqa: E402
 
 
+# raw surface-material grades (the 7×4 grid). G4 = rarest/most useful for engineering.
+_RAW_GRADE = {
+    "carbon": 1, "phosphorus": 1, "sulphur": 1, "iron": 1, "nickel": 1, "rhenium": 1, "lead": 1,
+    "vanadium": 2, "chromium": 2, "manganese": 2, "zinc": 2, "germanium": 2, "arsenic": 2, "zirconium": 2,
+    "niobium": 3, "molybdenum": 3, "cadmium": 3, "tin": 3, "tungsten": 3, "mercury": 3, "boron": 3,
+    "yttrium": 4, "technetium": 4, "ruthenium": 4, "selenium": 4, "tellurium": 4, "polonium": 4, "antimony": 4,
+}
+
+# ring class -> what it's worth mining for (ties into the Mining tab)
+_RING_HINT = {
+    "icy": "Icy — Low Temp. Diamonds, Void Opals, Bromellite, Tritium",
+    "rocky": "Rocky — Alexandrite, Monazite, Bromellite",
+    "metalrich": "Metal-Rich — Painite, Platinum, core gems (Musgravite/Serendibite/Monazite)",
+    "metalic": "Metallic — Platinum, Painite, Palladium",
+}
+
+
+def _ring_class(raw: str) -> str:
+    return str(raw or "").replace("eRingClass_", "").lower()
+
+
+def _clean(v: Any) -> str:
+    s = str(v or "")
+    if s.startswith("$") and s.endswith(";"):
+        s = s[1:-1]
+    return s.replace("Ring_Level_", "").replace("Resources", " Resources").strip()
+
+
 def _category(planet_class: str, star: bool, star_type: str) -> str:
     if star:
         if star_type in ("N", "H"):
@@ -67,8 +95,8 @@ class SystemEngine:
                     self._body_count = e.get("BodyCount")
             elif ev == "Scan":
                 self._scan(e)
-            elif ev == "SAASignalsFound":
-                self._bio(e)
+            elif ev in ("SAASignalsFound", "FSSBodySignals"):
+                self._signals(e)
             elif ev == "SAAScanComplete":
                 b = self._bodies.get(e.get("BodyID"))
                 if b:
@@ -110,6 +138,25 @@ class SystemEngine:
             if parent is not None:
                 break
         rings = [r for r in (e.get("Rings") or []) if "Belt" not in str(r.get("Name", ""))]
+        rings_detail = []
+        for r in rings:
+            rc = _ring_class(r.get("RingClass"))
+            short = " ".join(str(r.get("Name") or "").split()[-2:]) or r.get("Name")
+            rings_detail.append({"name": short, "ring_class": rc,
+                                 "hint": _RING_HINT.get(rc, ""), "mass_mt": r.get("MassMT")})
+        # surface materials (raw elements for SRV collection), rarest first
+        materials = []
+        for m in e.get("Materials") or []:
+            nm = str(m.get("Name") or "").lower()
+            grade = _RAW_GRADE.get(nm)
+            materials.append({"name": nm.capitalize(), "percent": round(float(m.get("Percent") or 0), 1),
+                              "grade": grade, "rare": bool(grade and grade >= 3)})
+        materials.sort(key=lambda x: (-(x["grade"] or 0), -x["percent"]))
+        comp = e.get("Composition") or {}
+        composition = ({"ice": round(100 * comp.get("Ice", 0)), "rock": round(100 * comp.get("Rock", 0)),
+                        "metal": round(100 * comp.get("Metal", 0))} if comp else None)
+        atmos = [{"name": a.get("Name"), "percent": round(float(a.get("Percent") or 0), 1)}
+                 for a in (e.get("AtmosphereComposition") or [])]
         prev = self._bodies.get(bid, {})
         self._bodies[bid] = {
             "id": bid, "name": e.get("BodyName", ""), "parent": parent,
@@ -118,28 +165,41 @@ class SystemEngine:
             "kind": (star_type + " star") if star else planet_class,
             "distance_ls": e.get("DistanceFromArrivalLS"),
             "value": value, "landable": bool(e.get("Landable", False)),
-            "terraformable": terraform, "discovered": discovered,
+            "terraformable": terraform, "terraform_state": e.get("TerraformState") or "",
+            "discovered": discovered,
             "mapped": mapped or prev.get("mapped_by_me", False),
             "mapped_by_me": prev.get("mapped_by_me", False),
-            "bio_signals": prev.get("bio_signals", 0),
-            "rings": len(rings), "atmosphere": e.get("Atmosphere") or "",
+            "bio_signals": prev.get("bio_signals", 0), "geo_signals": prev.get("geo_signals", 0),
+            "rings": len(rings), "rings_detail": rings_detail,
+            "reserve_level": _clean(e.get("ReserveLevel")) if rings else "",
+            "atmosphere": e.get("Atmosphere") or "", "atmosphere_composition": atmos,
             "volcanism": e.get("Volcanism") or "",
+            "materials": materials, "has_rare_mat": any(m["rare"] for m in materials),
+            "composition": composition,
             "gravity": e.get("SurfaceGravity"), "temperature": e.get("SurfaceTemperature"),
+            "surface_pressure": e.get("SurfacePressure"),
             "mass": mass, "radius": e.get("Radius"),
         }
 
-    def _bio(self, e: dict) -> None:
+    def _signals(self, e: dict) -> None:
         bid = e.get("BodyID")
-        count = 0
+        bio = geo = 0
         for s in e.get("Signals") or []:
-            if "biolog" in str(s.get("Type", "")).lower():
-                count = s.get("Count", count)
+            t = str(s.get("Type", "")).lower()
+            if "biolog" in t:
+                bio = s.get("Count", bio)
+            elif "geolog" in t:
+                geo = s.get("Count", geo)
         b = self._bodies.get(bid)
         if b:
-            b["bio_signals"] = count or b.get("bio_signals", 0)
+            if bio:
+                b["bio_signals"] = bio
+            if geo:
+                b["geo_signals"] = geo
         elif bid is not None:
             self._bodies[bid] = {"id": bid, "name": e.get("BodyName", ""), "parent": None,
-                                 "bio_signals": count, "category": "other", "pending": True}
+                                 "bio_signals": bio, "geo_signals": geo,
+                                 "category": "other", "pending": True}
 
     # --- snapshot -----------------------------------------------------------
     def snapshot(self) -> dict:
