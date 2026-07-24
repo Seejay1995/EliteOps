@@ -292,7 +292,12 @@ class CargoEngine:
     def prefill(self) -> dict[str, Any]:
         """Sensible defaults from live state so the form starts pre-filled."""
         snap = self.state.snapshot()
-        jr = snap.get("jump_range")
+        # Default to LADEN range — a trade route flown with a full hold, so the
+        # plotted hops are actually reachable. Fall back to max range if we don't
+        # have the mass/fuel data yet.
+        jr = snap.get("laden_jump_range")
+        if not isinstance(jr, (int, float)):
+            jr = snap.get("jump_range")
         return {
             "system": snap.get("system") or "",
             "station": snap.get("station") or "",

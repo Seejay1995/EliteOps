@@ -58,7 +58,9 @@ class EliteState:
         self.status: dict[str, Any] = {}
         self.cargo: list[dict[str, Any]] = []
         self.cargo_capacity: int | None = None
-        self.jump_range: float | None = None
+        self.jump_range: float | None = None          # MaxJumpRange = empty-cargo max
+        self.unladen_mass: float | None = None         # hull+modules, no fuel/cargo
+        self.fuel_capacity: float | None = None        # main tank size
         # listeners get (event_dict) for each new live journal event
         self._journal_listeners: list = []
 
@@ -144,6 +146,12 @@ class EliteState:
                 jr = e.get("MaxJumpRange")
                 if isinstance(jr, (int, float)):
                     self.jump_range = float(jr)
+                um = e.get("UnladenMass")
+                if isinstance(um, (int, float)):
+                    self.unladen_mass = float(um)
+                fc = e.get("FuelCapacity")
+                if isinstance(fc, dict) and isinstance(fc.get("Main"), (int, float)):
+                    self.fuel_capacity = float(fc["Main"])
 
     def _read_status(self) -> bool:
         path = os.path.join(self.dir, "Status.json")
@@ -188,6 +196,15 @@ class EliteState:
             fuel = self.status.get("Fuel") if isinstance(self.status, dict) else None
             fuel_main = fuel.get("FuelMain") if isinstance(fuel, dict) else fuel
             cargo_tons = sum(int(item.get("Count", 0)) for item in self.cargo)
+            # Laden jump range: MaxJumpRange is empty-cargo. Jump distance scales
+            # linearly with optimalMass/mass, so scale by the mass ratio at full
+            # main tank with a full cargo hold vs empty. Slightly conservative,
+            # which is what you want for planning reachable trade hops.
+            laden_jump = None
+            if (isinstance(self.jump_range, (int, float)) and self.unladen_mass
+                    and self.fuel_capacity is not None and self.cargo_capacity):
+                base = self.unladen_mass + self.fuel_capacity
+                laden_jump = round(self.jump_range * base / (base + self.cargo_capacity), 2)
             return {
                 "commander": self.commander,
                 "system": self.system,
@@ -198,6 +215,7 @@ class EliteState:
                 "cargo_tons": cargo_tons,
                 "cargo_capacity": self.cargo_capacity,
                 "jump_range": self.jump_range,
+                "laden_jump_range": laden_jump,
                 "cargo": list(self.cargo),
                 "body": self.status.get("BodyName") if isinstance(self.status, dict) else None,
             }
