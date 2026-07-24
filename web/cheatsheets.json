@@ -1,0 +1,237 @@
+{
+  "version": "2026-07-23",
+  "categories": [
+    { "id": "hge", "label": "High Grade Emissions", "icon": "📡" },
+    { "id": "raw", "label": "Raw Mats (surface)", "icon": "🪨" },
+    { "id": "data", "label": "Data / Encoded", "icon": "📶" },
+    { "id": "guardian", "label": "Guardian", "icon": "🔷" },
+    { "id": "trade", "label": "Traders & Tips", "icon": "🔁" }
+  ],
+  "sheets": [
+    {
+      "id": "hge-main",
+      "cat": "hge",
+      "title": "High Grade Emissions (HGE)",
+      "tier": "G4–G5 Manufactured",
+      "summary": "The go-to source for rare grade-4/5 manufactured mats. You don't filter for HGE directly — you filter for the right kind of system, then honk.",
+      "open": true,
+      "what": "HGE are a **Unidentified Signal Source** (usually **Threat 0**) that appear in supercruise. Which material is inside is decided by the **controlling faction's allegiance/economy** and its current **faction state** (Boom, War/Civil War, Civil Unrest, Outbreak). They spawn most reliably in **high-population systems (1M+)**.",
+      "find": [
+        "Open the **Galaxy Map → Info** panel and hunt a **high-population** system (1,000,000+) whose controlling faction matches the allegiance/economy you need (see the table).",
+        "Check that system's **Factions** tab for the required **state** (Boom / War / Civil War / Civil Unrest / Outbreak). No state needed for the Empire/Federation ones.",
+        "Jump in, then **honk the FSS** or just fly toward the populated bodies — HGE show up as USS contacts.",
+        "Fly to the USS until it resolves to **\"High Grade Emissions\"**, throttle into the **blue drop zone**, and scoop the material canisters.",
+        "**Relog** (Menu → Resume) to respawn the HGE in a known-good system and repeat."
+      ],
+      "filter": "Galaxy Map → high-population system + matching allegiance/economy + required faction state → honk FSS → drop into the HGE USS",
+      "yields": [
+        { "Material": "Imperial Shielding", "Grade": 5, "System + state": "Empire allegiance · high-pop · any state", "Group": "Shielding" },
+        { "Material": "Core Dynamics Composites", "Grade": 5, "System + state": "Federation · high-pop · any state", "Group": "Composite" },
+        { "Material": "Proprietary Composites", "Grade": 4, "System + state": "Federation (some Empire) · high-pop", "Group": "Composite" },
+        { "Material": "Proto Radiolic Alloys", "Grade": 5, "System + state": "Independent/Alliance · high-pop · **Boom**", "Group": "Alloys" },
+        { "Material": "Proto Light Alloys", "Grade": 4, "System + state": "Independent/Alliance · high-pop · **Boom**", "Group": "Alloys" },
+        { "Material": "Proto Heat Radiators", "Grade": 4, "System + state": "Independent/Alliance · high-pop · **Boom**", "Group": "Thermic" },
+        { "Material": "Military Grade Alloys", "Grade": 5, "System + state": "any allegiance · high-pop · **War / Civil War**", "Group": "Alloys" },
+        { "Material": "Military Supercapacitors", "Grade": 5, "System + state": "any · high-pop · **War / Civil War**", "Group": "Capacitors" },
+        { "Material": "Improvised Components", "Grade": 5, "System + state": "Independent · high-pop · **Civil Unrest**", "Group": "Composite" },
+        { "Material": "Pharmaceutical Isolators", "Grade": 5, "System + state": "any · high-pop · **Outbreak**", "Group": "Chemical" }
+      ],
+      "tips": [
+        "**Easiest G5 in the game: Imperial Shielding** — any high-pop Imperial system, no state needed. Load ~100, then trade down 6:1... actually **manufactured trades 6:1 down / 3:1 up** at a Manufactured Material Trader to fill any other category.",
+        "The **Boom** pool holds three proto-materials at once, so farming Proto Radiolic directly is slow — most people farm Imperial Shielding and **trade for** the protos.",
+        "**War/Civil War** and **Outbreak** states are rarer to find, so those mats are usually traded for rather than farmed.",
+        "Community trackers list recent HGE sightings from live player data — handy for finding an active spot fast."
+      ],
+      "refs": [
+        { "label": "edgalaxy HGE finder", "url": "https://edgalaxy.net/hge" },
+        { "label": "Inara nearest", "url": "https://inara.cz/elite/nearest/" }
+      ]
+    },
+    {
+      "id": "raw-shards",
+      "cat": "raw",
+      "title": "Crystalline Shards — grade-4 raw mats",
+      "tier": "G4 Raw",
+      "summary": "The fastest way to fill grade-4 raw bins without a trader. One qualifying body reliably hands you one of the 7 rare raws in bulk.",
+      "what": "Fields of tall crystal clusters on **airless volcanic worlds**. Shoot the clusters with the SRV and scoop the drops — each qualifying body gives **one grade-4 raw** (plus lower grades). The material is set by the **body's surface composition**, not the shard colour, so identify sites by **body**, not by colour.",
+      "find": [
+        "Look for a landable body that is **airless (no atmosphere)**, has **volcanism**, and sits **≥ 12,000 Ls** from the system's main star (that distance is what keeps it cold enough).",
+        "The main star should be spectral type **A, F, G, K, M or S**.",
+        "On arrival run the **FSS**, then **DSS-probe** the body. Shard fields show up under the **BIOLOGICAL** heat-map filter (not Geological) — fumaroles are usually co-located.",
+        "DSS-mapping drops nav waypoints straight to the fields. Drop in, board the **SRV**, shoot the **Crystalline Clusters**, scoop the mats.",
+        "Fill to the **100 cap**, then trade down 1→3 at a **Raw Material Trader** to fill the rest of that category's column."
+      ],
+      "filter": "System map → airless + volcanic body, >12,000 Ls from an A/F/G/K/M/S star → DSS probe → BIOLOGICAL heat-map filter → SRV the clusters",
+      "yields": [
+        { "System · Body": "HIP 36601 · C 1 A", "Material": "Polonium", "Grade": 4 },
+        { "System · Body": "HIP 36601 · C 1 D", "Material": "Ruthenium", "Grade": 4 },
+        { "System · Body": "HIP 36601 · C 3 B", "Material": "Tellurium", "Grade": 4 },
+        { "System · Body": "HIP 36601 · C 5 A", "Material": "Technetium", "Grade": 4 },
+        { "System · Body": "Outotz LS-K d8-3 · B 5 A", "Material": "Yttrium", "Grade": 4 },
+        { "System · Body": "Outotz LS-K d8-3 · B 5 C", "Material": "Antimony", "Grade": 4 }
+      ],
+      "tips": [
+        "**HIP 36601 is the famous one-stop system** — four shard bodies covering Polonium, Ruthenium, Tellurium and Technetium. **Outotz LS-K d8-3** adds Yttrium and Antimony. Those two systems cover **6 of the 7** rare raws.",
+        "**Selenium is the odd one out** — it's rarely at shard sites; farm it from **Brain Trees** instead (see the Brain Trees card).",
+        "Closest shard cluster to the bubble is ~1,500 ly out in the **Sanguineous Rim** region — this is a deep-space trip, so bring the fuel-scoop build.",
+        "All 7 rare raws are **grade 4**, one at the top of each raw category — fill grade 4 and trade down to fill entire columns."
+      ],
+      "refs": [
+        { "label": "ed-dsn shard sites", "url": "https://ed-dsn.net/en/crystalline-shards_en/" },
+        { "label": "Fandom: Crystalline Shard", "url": "https://elite-dangerous.fandom.com/wiki/Crystalline_Shard" }
+      ]
+    },
+    {
+      "id": "raw-braintrees",
+      "cat": "raw",
+      "title": "Brain Trees — Selenium & rare raws",
+      "tier": "G1–G4 Raw",
+      "summary": "The main source for Selenium (which shards rarely give) and an alternative for grade-4 raws.",
+      "what": "Organic tree-like structures whose **growth nodes**, when shot with the SRV and scooped, drop raw mats. The rarest node — **Phloem Excretion** — gives **grade-4** raws and grows on the 'brain' portion rather than the branches.",
+      "find": [
+        "Find a **volcanic landable body** with **Guardian Ruins / ejecta craters** (recognisable from orbit by radiating lines), surface temp roughly **200–496 K**.",
+        "**DSS-map** the body and drop into a crater field. From above ~3 km, nodes show as tiny **blue POI blips** on radar.",
+        "Drive the SRV between the trees and shoot the node type you want — **Phloem Excretion** for grade 4 — then scoop."
+      ],
+      "yields": [
+        { "Node": "Cordycep Growth", "Gives grade": 1 },
+        { "Node": "Polyporous Growth", "Gives grade": 2 },
+        { "Node": "Mussidaen Seed Pod", "Gives grade": 3 },
+        { "Node": "Phloem Excretion", "Gives grade": 4 }
+      ],
+      "tips": [
+        "Known **Selenium** brain-tree sites: **Kappa-1 Volantis B 3 F A** and **HR 3230 3 A A**.",
+        "Each node gives ~1 unit vs ~3 per shard cluster, so use **shards** where available and brain trees mainly for **Selenium**."
+      ],
+      "refs": [ { "label": "Canonn: Brain Trees", "url": "https://canonn.science/codex/guardians-trees-brain-trees/" } ]
+    },
+    {
+      "id": "raw-prospecting",
+      "cat": "raw",
+      "title": "Surface Prospecting — target a specific raw",
+      "tier": "G1–G4 Raw",
+      "summary": "Every landable body has a fixed material menu. Pick a body rich in the raw you need and shoot the right rock type.",
+      "what": "Drive the SRV over any landable body and shoot surface **mineral nodes**, then scoop (**×3 units** per drop). Each body's **Materials** list (system map) shows its fixed spread — typically **1 rare (G4), 2 standard (G3), 3 common (G2), 5 very-common (G1)** — so target a body whose G4 is the raw you want.",
+      "find": [
+        "In the system map, read a body's **Materials** percentages and pick one rich in your target raw.",
+        "Land, deploy the SRV, and drive to **rocky deposits / volcanic protrusions**.",
+        "Shoot the node type that biases toward the grade you want (see table), then scoop."
+      ],
+      "yields": [
+        { "Node type": "Metallic Meteorite", "Grade bias": "Rarest (G3–G4) on the body" },
+        { "Node type": "Needle Crystals", "Grade bias": "Rarest (G3–G4) on the body" },
+        { "Node type": "Mesosiderite", "Grade bias": "Rare-leaning mix" },
+        { "Node type": "Outcrop / Bronzite Chondrite", "Grade bias": "Random spread of the body's mats" },
+        { "Node type": "Piceous Cobble", "Grade bias": "Always lowest (G1)" }
+      ],
+      "tips": [
+        "Drop rates are far lower than shard/brain-tree sites — prospecting is best for **topping up a specific mid-grade raw** a body is rich in, not bulk G4 farming.",
+        "Scan formations with the **Composition Scanner** for free Codex credit while you're there."
+      ]
+    },
+    {
+      "id": "raw-geysers",
+      "cat": "raw",
+      "title": "Geysers & Fumaroles — common raws",
+      "tier": "G1–G2 Raw",
+      "summary": "Geological vents for near-universal common raws like Sulphur. Good for filling the bottom of a category.",
+      "what": "Surface vents that emit gas and minerals. They spawn **geological POIs** with deposit nodes you harvest for common raws — the exact set depends on the vent/magma type and body composition.",
+      "find": [
+        "Filter the **DSS heat-map to GEOLOGICAL** signals to find geyser/fumarole sites — this drops waypoints.",
+        "Drop in with the SRV; at each formation shoot the **Cobble/deposit** objects and scoop (×3 per drop)."
+      ],
+      "tips": [ "Best for **common raws** (Sulphur is near-universal), not grade-4 farming. Fumaroles often sit next to crystalline-shard fields, so you can do both in one landing." ],
+      "refs": [ { "label": "Fandom: Fumarole", "url": "https://elite-dangerous.fandom.com/wiki/Fumarole" } ]
+    },
+    {
+      "id": "data-jameson",
+      "cat": "data",
+      "title": "Jameson Crash Site — encoded data goldmine",
+      "tier": "G3–G5 Encoded",
+      "summary": "The single best spot to farm high-grade encoded data. One SRV, a relog loop, and you fill up fast.",
+      "what": "A crashed Cobra at **HIP 12099, body 1 B**. Sweeping the SRV turret over its data points yields **Adaptive Encryptors Capture (G5)** and **Atypical Encryption Archives (G4)** — the two 'currency' encryption mats you trade for anything else.",
+      "find": [
+        "Jump to **HIP 12099**, supercruise to **planet 1**, drop to its moon **1 B**.",
+        "**DSS-probe** the body — the wreck POI is marked. Land near it and deploy the **SRV**.",
+        "Sit still and sweep the SRV **turret** across the blinking data points (≈9 of them).",
+        "When you get **\"storage full / unable to receive data\"**, Menu → **Resume** (mode relog) to respawn the points, then rescan.",
+        "Take the two encryption files to the **Encoded Material Trader** (nearest: **Ray Gateway, Diaguandri**) and trade for whatever encoded mats you actually need."
+      ],
+      "tips": [
+        "This is faster than wake-scanning for **Datamined Wake Exceptions** — farm Adaptive Encryptors here and **trade up** for them (~2× faster).",
+        "No weapons needed; the site has no threats. Just an SRV and patience."
+      ],
+      "refs": [ { "label": "Jameson site guide", "url": "https://edblackbox.com/guides/engineering/materials-and-farming/jameson-crash-site.html" } ]
+    },
+    {
+      "id": "data-wake",
+      "cat": "data",
+      "title": "FSD Wake Scanning",
+      "tier": "G1–G5 Encoded (Wake)",
+      "summary": "Encoded 'wake' data for FSD engineering — scan the clouds ships leave when they jump.",
+      "what": "Fit a **Frame Shift Wake Scanner** (utility). Scan the **high wakes** (bright blue clouds left when a ship jumps to hyperspace) to collect **Datamined Wake Exceptions (G5)**, **Eccentric Hyperspace Trajectories (G4)**, **Strange Wake Solutions (G3)**, and lower.",
+      "find": [
+        "Mount a **Frame Shift Wake Scanner** and head to a **busy Nav Beacon** or station no-fire zone in a **high-population** system.",
+        "Target the **High Wake** cloud a ship leaves as it hyperspace-jumps (not the low wakes from in-system travel).",
+        "Fly into scan range and let the scanner complete — the data drops straight into your Encoded storage."
+      ],
+      "tips": [
+        "High-traffic hubs give the most wakes. If you only need Datamined Wake Exceptions, farm **Jameson** instead and trade up — it's faster.",
+        "The wake scanner also passively logs data while you fly — great to leave fitted on the Corsair mat build."
+      ]
+    },
+    {
+      "id": "data-points",
+      "cat": "data",
+      "title": "Settlement / Installation Data Points",
+      "tier": "G3–G5 Encoded (Firmware)",
+      "summary": "Rare firmware from scanning terminals at surface settlements, installations and megaships.",
+      "what": "Fit a **Data Link Scanner** (utility) and scan the glowing **data terminals / comms arrays** at planetary settlements, surface POIs, installations and megaships. Source of rare firmware like **Modified Embedded Firmware (G5)** and **Specialised Legacy Firmware (G5)**.",
+      "find": [
+        "Fit a **Data Link Scanner** utility module.",
+        "Drop at a **planetary settlement**, **installation** or **megaship** and target the glowing data comms points.",
+        "Hold the scan until complete. Small/abandoned and mission-target settlements often carry the rarest firmware."
+      ],
+      "tips": [ "The very rarest G5 firmware is usually easier to get by farming Jameson data and **trading**, but data points are the direct in-world source." ]
+    },
+    {
+      "id": "guardian-modules",
+      "cat": "guardian",
+      "title": "Guardian Structures — module/weapon mats",
+      "tier": "Guardian Tech Broker",
+      "summary": "Shoot Sentinels with the SRV to farm the mats that unlock Guardian FSD boosters, hull, and weapons.",
+      "what": "At a **Guardian Structure** you activate the central pylon, **Sentinels** spawn, and shooting them with the SRV drops **Guardian Power Cells, Power Conduits, Tech Components, Wreckage Components** and **Sentinel Wafers** — the mats a **Guardian Tech Broker** wants.",
+      "find": [
+        "Fly to a **Guardian Structure** system (use the Guardian tab's finder), land near the site and deploy the **SRV** (bring spares — Sentinels destroy SRVs).",
+        "Drive to the **central structure** and activate it to spawn Sentinels.",
+        "**Shoot the Sentinels** with the SRV turret to collect their mats; scan the **pylons/relay** for Guardian data.",
+        "Grab the **Ancient Relic/Casket/Tablet/Totem/Urn** commodities if you need to activate obelisks."
+      ],
+      "tips": [
+        "The **Corsair mat build** carries a size-6 SRV hangar for exactly this — redeploy without flying home.",
+        "You don't need ship weapons; the SRV does all the fighting."
+      ],
+      "refs": [ { "label": "Open the Guardian tab", "url": "#guardian" } ]
+    },
+    {
+      "id": "trade-traders",
+      "cat": "trade",
+      "title": "Material Traders — turn junk into what you need",
+      "tier": "Every category",
+      "summary": "The multiplier that makes all farming worth it. Farm one abundant mat, trade for the rest.",
+      "what": "Three trader types (**Raw, Manufactured, Encoded**) let you convert materials **within a category**. You lose value on the exchange, but it means you never have to farm a specific rare mat — just farm an abundant one and trade.",
+      "yields": [
+        { "Trade": "Same grade, sideways", "Rate": "6 → 1" },
+        { "Trade": "Trade UP one grade", "Rate": "6 → 1" },
+        { "Trade": "Trade DOWN one grade", "Rate": "1 → 3" }
+      ],
+      "tips": [
+        "**Raw:** farm one common raw (e.g. from an abundant surface deposit or crystalline shards) and trade across the whole 7×4 grid.",
+        "**Manufactured:** farm **Imperial Shielding** at HGE, trade for anything.",
+        "**Encoded:** farm **Jameson** encryption data, trade for anything.",
+        "Trader **type** follows the station's economy — EliteOps' Materials tab finds the nearest of each type for you."
+      ],
+      "refs": [ { "label": "Open the Materials tab", "url": "#engmat" } ]
+    }
+  ]
+}

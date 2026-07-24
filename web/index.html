@@ -285,6 +285,33 @@
     main{order:1}
     .logo{font-size:.95rem}
   }
+  /* cheat sheets */
+  .cheat-cats{display:flex;flex-wrap:wrap;gap:.4rem}
+  .cheat-chip{cursor:pointer;user-select:none;border:1px solid var(--line);background:var(--bg);color:var(--text);
+    border-radius:999px;padding:.3rem .7rem;font-size:.78rem;white-space:nowrap;transition:.12s}
+  .cheat-chip:hover{border-color:var(--orange)}
+  .cheat-chip.on{background:var(--orange);border-color:var(--orange);color:#1a1103;font-weight:600}
+  .cheat-card{border:1px solid var(--line);border-radius:.6rem;background:var(--panel);margin-bottom:.7rem;overflow:hidden}
+  .cheat-card>summary{cursor:pointer;list-style:none;padding:.7rem .85rem;display:flex;align-items:baseline;gap:.55rem;flex-wrap:wrap}
+  .cheat-card>summary::-webkit-details-marker{display:none}
+  .cheat-card>summary:hover{background:var(--bg)}
+  .cheat-card .ct{font-weight:600;font-size:.98rem}
+  .cheat-card .cti{font-size:1.05rem}
+  .cheat-tier{font-size:.68rem;letter-spacing:.03em;text-transform:uppercase;color:var(--orange);
+    border:1px solid var(--line);border-radius:.3rem;padding:.08rem .4rem}
+  .cheat-sum{color:var(--dim);font-size:.82rem;flex-basis:100%;margin-top:.1rem}
+  .cheat-body{padding:0 .85rem .85rem;border-top:1px solid var(--line)}
+  .cheat-body h4{margin:.8rem 0 .35rem;font-size:.82rem;letter-spacing:.02em;text-transform:uppercase;color:var(--dim)}
+  .cheat-body ol,.cheat-body ul{margin:.2rem 0;padding-left:1.2rem}
+  .cheat-body li{margin:.22rem 0;font-size:.88rem;line-height:1.4}
+  .cheat-tbl{width:100%;border-collapse:collapse;font-size:.84rem;margin-top:.3rem}
+  .cheat-tbl th,.cheat-tbl td{text-align:left;padding:.3rem .45rem;border-bottom:1px solid var(--line);vertical-align:top}
+  .cheat-tbl th{color:var(--dim);font-weight:500;font-size:.72rem;text-transform:uppercase}
+  .cheat-tbl .g{color:var(--orange);font-weight:600;white-space:nowrap}
+  .cheat-filter{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);
+    border-radius:.45rem;padding:.5rem .6rem;margin-top:.35rem;font-size:.85rem}
+  .cheat-filter code{color:var(--text);font-family:inherit}
+  .cheat-refs a{color:var(--dim);font-size:.76rem;margin-right:.7rem}
 </style>
 </head>
 <body>
@@ -312,6 +339,7 @@
       <div class="tab" data-view="guardian"><span class="i">🔷</span><span>Guardian</span></div>
       <div class="tab" data-view="engmat"><span class="i">🧪</span><span>Materials</span></div>
       <div class="tab" data-view="mining"><span class="i">⛏️</span><span>Mining</span></div>
+      <div class="tab" data-view="cheat"><span class="i">📋</span><span>Cheats</span></div>
       <div class="tab" data-view="cg"><span class="i">🏆</span><span>Goals</span></div>
       <div class="tab" data-view="colony"><span class="i">🏗️</span><span>Colony</span></div>
       <div class="tab" data-view="firsts"><span class="i">★</span><span>Firsts</span></div>
@@ -662,6 +690,18 @@
             </div>
           </details>
         </div>
+      </section>
+      <section class="view" id="view-cheat">
+        <h2>Cheat Sheets</h2>
+        <div class="card" style="margin-bottom:.8rem">
+          <div class="sw-toolbar" style="margin:0">
+            <input id="cheatSearch" type="text" placeholder="search materials, methods, filters…" style="flex:1;min-width:12rem;background:var(--bg);border:1px solid var(--line);color:var(--text);border-radius:.4rem;padding:.5rem;font-family:inherit">
+            <span class="muted" id="cheatCount" style="font-size:.76rem"></span>
+          </div>
+          <div id="cheatCats" class="cheat-cats" style="margin-top:.6rem"></div>
+          <div class="muted" id="cheatHere" style="font-size:.78rem;margin-top:.5rem"></div>
+        </div>
+        <div id="cheatGrid"></div>
       </section>
       <section class="view" id="view-firsts">
         <h2>Firsts Radar</h2>
@@ -1947,6 +1987,80 @@ guardianTick(); setInterval(guardianTick, 3000);
 engmatTick(); setInterval(engmatTick, 3000);
 loadShips(); loadPresetList(); shipwrightTick(); setInterval(shipwrightTick, 2500);
 eddTick(); setInterval(eddTick, 15000);
+
+/* ---- cheat sheets ---- */
+const cheat = { data:null, cat:'all', q:'' };
+async function cheatInit(){
+  try{ cheat.data = await jget('/cheatsheets.json'); }
+  catch(e){ $('cheatGrid').innerHTML = '<div class="muted">Could not load cheat sheets.</div>'; return; }
+  const cats = [{id:'all',label:'All',icon:'✦'}].concat(cheat.data.categories||[]);
+  $('cheatCats').innerHTML = cats.map(c=>
+    `<span class="cheat-chip${c.id==='all'?' on':''}" data-cat="${esc(c.id)}">${c.icon||''} ${esc(c.label)}</span>`).join('');
+  $('cheatCats').querySelectorAll('.cheat-chip').forEach(ch=>ch.addEventListener('click',()=>{
+    cheat.cat = ch.dataset.cat;
+    $('cheatCats').querySelectorAll('.cheat-chip').forEach(x=>x.classList.toggle('on',x===ch));
+    cheatRender();
+  }));
+  $('cheatSearch').addEventListener('input', e=>{ cheat.q = e.target.value.toLowerCase().trim(); cheatRender(); });
+  cheatRender();
+}
+function cheatMatch(s){
+  if(cheat.cat!=='all' && s.cat!==cheat.cat) return false;
+  if(!cheat.q) return true;
+  const hay = JSON.stringify(s).toLowerCase();
+  return cheat.q.split(/\s+/).every(w=>hay.includes(w));
+}
+function cheatList(items, ordered){
+  if(!items||!items.length) return '';
+  const tag = ordered?'ol':'ul';
+  return `<${tag}>`+items.map(x=>`<li>${cheatInline(x)}</li>`).join('')+`</${tag}>`;
+}
+// allow **bold** and `code` in sheet text, everything else escaped
+function cheatInline(t){
+  return esc(String(t)).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`(.+?)`/g,'<code>$1</code>');
+}
+function cheatTable(y){
+  if(!y||!y.length) return '';
+  const cols = Object.keys(y[0]);
+  const head = cols.map(c=>`<th>${esc(c)}</th>`).join('');
+  const rows = y.map(r=>'<tr>'+cols.map(c=>{
+    const v = r[c]==null?'':r[c];
+    const cls = /grade|tier/i.test(c) ? ' class="g"' : '';
+    return `<td${cls}>${cheatInline(v)}</td>`;
+  }).join('')+'</tr>').join('');
+  return `<div style="overflow-x:auto"><table class="cheat-tbl"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function cheatCard(s){
+  const cat = (cheat.data.categories||[]).find(c=>c.id===s.cat) || {};
+  let b = '';
+  if(s.what) b += `<p style="font-size:.9rem;line-height:1.5;margin:.7rem 0 0">${cheatInline(s.what)}</p>`;
+  if(s.find && s.find.length){ b += '<h4>How to find it</h4>'+cheatList(s.find, true); }
+  if(s.filter){ b += `<h4>Map / FSS filter</h4><div class="cheat-filter"><code>${cheatInline(s.filter)}</code>`+
+    `<button class="btn ghost" style="padding:.25rem .6rem;font-size:.75rem" onclick="cheatCopy(this,${JSON.stringify(JSON.stringify(s.filter))})">⧉ copy</button></div>`; }
+  if(s.yields && s.yields.length){ b += '<h4>What you get</h4>'+cheatTable(s.yields); }
+  if(s.tips && s.tips.length){ b += '<h4>Pro tips</h4>'+cheatList(s.tips, false); }
+  if(s.refs && s.refs.length){ b += '<div class="cheat-refs" style="margin-top:.7rem">'+
+    s.refs.map(r=>`<a href="${esc(r.url)}" target="_blank" rel="noopener">↗ ${esc(r.label||r.url)}</a>`).join('')+'</div>'; }
+  return `<details class="cheat-card"${s.open?' open':''}><summary>`+
+    `<span class="cti">${cat.icon||'📋'}</span><span class="ct">${esc(s.title)}</span>`+
+    (s.tier?`<span class="cheat-tier">${esc(s.tier)}</span>`:'')+
+    (s.summary?`<span class="cheat-sum">${esc(s.summary)}</span>`:'')+
+    `</summary><div class="cheat-body">${b}</div></details>`;
+}
+function cheatRender(){
+  if(!cheat.data) return;
+  const items = (cheat.data.sheets||[]).filter(cheatMatch);
+  $('cheatCount').textContent = items.length+' / '+(cheat.data.sheets||[]).length;
+  $('cheatGrid').innerHTML = items.length ? items.map(cheatCard).join('')
+    : '<div class="muted" style="padding:1rem">No cheat sheet matches that search.</div>';
+  // live "you are here" hint
+  const sys = (window._state||{}).system;
+  $('cheatHere').innerHTML = sys ? `Current system: <b>${esc(sys)}</b> — open the in-game Galaxy Map here and apply a filter below.` : '';
+}
+function cheatCopy(btn, json){
+  try{ navigator.clipboard.writeText(JSON.parse(json)); const o=btn.textContent; btn.textContent='✓ copied'; setTimeout(()=>btn.textContent=o,1200); }catch(e){}
+}
+cheatInit();
 </script>
 </body>
 </html>
