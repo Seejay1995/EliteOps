@@ -984,6 +984,34 @@ function updateBuildTitle(){
   el.textContent = (sw.build.name||'Untitled build') + '  —  ' + ship;
 }
 
+let _lastRowSig=null;
+// Signature of everything that affects the editor selects. If unchanged, the
+// periodic tick must NOT rebuild the rows (that would slam any open dropdown shut).
+function rowSig(){
+  if(!sw.build) return '';
+  return sw.build.ship+'::'+sw.build.modules.map(m=>
+    [m.category,m.type,m.class,m.rating,m.blueprint,m.grade,m.experimental,m.quantity,m.acquisition].join('|')
+  ).join('¦');
+}
+// Refresh only the live reconciliation status dots, in place — leaves the <select>
+// nodes (and any open dropdown / focus) untouched.
+function updateReconDots(){
+  const recon = (sw.snap && sw.snap.reconciliation) || [];
+  document.querySelectorAll('#swRows tr[data-idx]').forEach(tr=>{
+    const dot = tr.querySelector('.st-dot'); if(!dot) return;
+    const st = (recon[+tr.dataset.idx]||{}).status || 'none';
+    dot.className = 'st-dot st-'+st; dot.title = st;
+  });
+}
+// Called from the periodic tick: rebuild rows only if the build genuinely changed
+// AND the user isn't interacting with the editor; otherwise just tick the dots.
+function refreshRowsLive(){
+  if(!sw.build) return;
+  const editing = document.activeElement && $('swRows').contains(document.activeElement);
+  if(rowSig()!==_lastRowSig && !editing) renderRows();
+  else updateReconDots();
+}
+
 function renderRows(){
   updateBuildTitle();
   const b = sw.build;
@@ -1025,6 +1053,7 @@ function renderRows(){
       `<td>${sel('acquisition',i,acqOpts,m.acquisition)}</td>`+
       `<td><button class="xbtn" data-remove="${i}">✕</button></td></tr>`;
   }).join('');
+  _lastRowSig = rowSig();
 }
 
 let _reRenderPending=false;
@@ -1130,7 +1159,7 @@ async function shipwrightTick(){
   renderMaterials(d.material_plan);
   renderEngineers(d.engineer_plan||[]);
   renderAcquisition(d.acquisition||{});
-  if(sw.build) renderRows();
+  if(sw.build) refreshRowsLive();
 }
 
 function renderEngineers(list){
@@ -1180,8 +1209,15 @@ $('swAcqBtn').addEventListener('click', async()=>{
     if((d.acquisition||{}).status!=='searching') break; }
 });
 
+let _lastSavedSig=null;
 function renderSaved(list){
-  const s=$('swSaved'), cur=s.value;
+  const s=$('swSaved');
+  const sig = list.map(b=>b.slug+':'+b.name+':'+b.modules).join('|');
+  // Don't rebuild (and slam shut) the dropdown on every tick if nothing changed,
+  // or while the user has it open/focused.
+  if(sig===_lastSavedSig || document.activeElement===s) return;
+  _lastSavedSig = sig;
+  const cur=s.value;
   s.innerHTML = '<option value="">— saved builds —</option>' +
     list.map(b=>`<option value="${esc(b.slug)}">${esc(b.name)} (${b.modules})</option>`).join('');
   if(list.some(b=>b.slug===cur)) s.value=cur;
