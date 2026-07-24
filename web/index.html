@@ -242,6 +242,25 @@
   .st-dot{display:inline-block;width:.6rem;height:.6rem;border-radius:50%}
   .st-installed{background:var(--green)} .st-needs-engineering{background:var(--cyan)}
   .st-needs-buy{background:var(--gold)} .st-none{background:var(--dim)}
+  /* have-vs-build status badge (build editor) */
+  .stb{display:inline-flex;align-items:center;gap:.25rem;font-size:.7rem;font-weight:600;
+    white-space:nowrap;border:1px solid currentColor;border-radius:.3rem;padding:.05rem .3rem;line-height:1.35}
+  .stb-installed{color:var(--green)} .stb-needs-engineering{color:var(--cyan)}
+  .stb-needs-buy{color:var(--gold)} .stb-none{color:var(--dim);border-color:var(--line)}
+  /* reconciliation summary bar */
+  .recon-sum{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center;margin:.55rem 0 .1rem;font-size:.8rem}
+  .recon-pill{display:inline-flex;align-items:center;gap:.35rem;border:1px solid var(--line);
+    border-radius:999px;padding:.12rem .55rem}
+  .recon-pill b{font-variant-numeric:tabular-nums}
+  .recon-pill.have{color:var(--green)} .recon-pill.eng{color:var(--cyan)} .recon-pill.buy{color:var(--gold)}
+  .recon-bar{flex:1;min-width:7rem;height:.5rem;border-radius:999px;background:var(--bg);
+    border:1px solid var(--line);overflow:hidden;display:flex}
+  .recon-bar i{display:block;height:100%}
+  .recon-bar .b-have{background:var(--green)} .recon-bar .b-eng{background:var(--cyan)} .recon-bar .b-buy{background:var(--gold)}
+  /* material plan progress + row emphasis */
+  .matbar{height:.5rem;border-radius:999px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin:.5rem 0 .2rem}
+  .matbar i{display:block;height:100%;background:var(--green)}
+  tr.mat-ready{opacity:.5} tr.mat-short td:nth-child(5){color:var(--gold);font-weight:700}
   .xbtn{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:.3rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit}
   .sw-import{width:100%;min-height:6rem;background:var(--bg);border:1px solid var(--line);color:var(--text);
     border-radius:.4rem;padding:.5rem;font-family:inherit;font-size:.78rem;display:none}
@@ -467,6 +486,7 @@
         <div class="card">
           <div class="sw-eyebrow">Build plan — the loadout you're working toward</div>
           <div class="sw-shipname" id="swBuildTitle" style="font-size:1.05rem">No build open</div>
+          <div class="recon-sum" id="swReconSummary"></div>
           <div class="sw-toolbar" style="margin-top:.6rem">
             <select id="swSaved" title="saved builds"><option value="">— saved builds —</option></select>
             <button class="btn ghost" id="swLoad" style="padding:.4rem .7rem">Load</button>
@@ -487,7 +507,7 @@
           <div class="tblwrap-x">
             <table class="editor-tbl">
               <thead><tr>
-                <th></th><th>Category</th><th>Type</th><th>Cls</th><th>Rat</th>
+                <th>Have?</th><th>Category</th><th>Type</th><th>Cls</th><th>Rat</th>
                 <th>Blueprint</th><th>G</th><th>Experimental</th><th>Qty</th><th>Acquire</th><th></th>
               </tr></thead>
               <tbody id="swRows"></tbody>
@@ -496,7 +516,12 @@
           <div class="muted" id="swEmpty" style="font-size:.82rem;margin-top:.5rem">Pick a hull or load a preset to start a build. Dropdowns filter by type — Hardpoint shows only weapons.</div>
         </div>
         <div class="card" id="swMatCard" style="display:none">
-          <h2 style="font-size:1rem">Materials to finish this build <small class="muted" id="swMatSummary"></small></h2>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <h2 style="font-size:1rem;margin:0">Materials to finish this build <small class="muted" id="swMatSummary"></small></h2>
+            <span style="flex:1"></span>
+            <label class="toggle" style="padding:0;font-size:.78rem"><input id="swMatHideReady" type="checkbox"> hide ready</label>
+          </div>
+          <div class="matbar"><i id="swMatBar" style="width:0%"></i></div>
           <div class="tblwrap-x"><table class="firsts" id="swMatTable">
             <thead><tr><th>Material</th><th>Category</th><th class="r">Need</th><th class="r">Have</th><th class="r">Short</th><th>Used by</th></tr></thead>
             <tbody id="swMatRows"></tbody>
@@ -1033,15 +1058,46 @@ function rowSig(){
     [m.category,m.type,m.class,m.rating,m.blueprint,m.grade,m.experimental,m.quantity,m.acquisition].join('|')
   ).join('¦');
 }
-// Refresh only the live reconciliation status dots, in place — leaves the <select>
-// nodes (and any open dropdown / focus) untouched.
+// status badge: how each build module compares to what's on your current ship
+const ST_META = {
+  'installed':         {icon:'✓', label:'have', title:'already fitted on your current ship (and engineered)'},
+  'needs-engineering': {icon:'⚙', label:'eng',  title:'fitted on your ship, but still needs this engineering'},
+  'needs-buy':         {icon:'⛒', label:'buy',  title:'not on your current ship — buy / outfit it'},
+  'none':              {icon:'–', label:'',      title:'no current ship to compare against'},
+};
+function stBadge(st){
+  const m = ST_META[st] || ST_META.none;
+  return `<span class="stb stb-${st}" title="${m.title}">${m.icon}${m.label?' '+m.label:''}</span>`;
+}
+// Refresh only the live reconciliation status badges + summary, in place — leaves
+// the <select> nodes (and any open dropdown / focus) untouched.
 function updateReconDots(){
   const recon = (sw.snap && sw.snap.reconciliation) || [];
   document.querySelectorAll('#swRows tr[data-idx]').forEach(tr=>{
-    const dot = tr.querySelector('.st-dot'); if(!dot) return;
+    const cell = tr.querySelector('.stcell'); if(!cell) return;
     const st = (recon[+tr.dataset.idx]||{}).status || 'none';
-    dot.className = 'st-dot st-'+st; dot.title = st;
+    cell.innerHTML = stBadge(st);
   });
+  renderReconSummary();
+}
+// at-a-glance count of have / to-engineer / to-buy across the whole build
+function renderReconSummary(){
+  const el = $('swReconSummary'); if(!el) return;
+  const recon = (sw.snap && sw.snap.reconciliation) || [];
+  if(!sw.build || !sw.build.modules.length || !recon.length){ el.innerHTML=''; return; }
+  let have=0, eng=0, buy=0;
+  recon.forEach(r=>{ const s=r.status;
+    if(s==='installed') have++; else if(s==='needs-engineering') eng++; else if(s==='needs-buy') buy++; });
+  const tot = (have+eng+buy) || 1, pc = n => Math.round(n/tot*100);
+  el.innerHTML =
+    `<span class="recon-pill have" title="already fitted on your current ship">✓ <b>${have}</b> have</span>`+
+    `<span class="recon-pill eng" title="fitted, still needs engineering">⚙ <b>${eng}</b> to engineer</span>`+
+    `<span class="recon-pill buy" title="not on your ship yet">⛒ <b>${buy}</b> to buy</span>`+
+    `<span class="recon-bar" title="${have} have · ${eng} engineer · ${buy} buy">`+
+      (have?`<i class="b-have" style="width:${pc(have)}%"></i>`:'')+
+      (eng?`<i class="b-eng" style="width:${pc(eng)}%"></i>`:'')+
+      (buy?`<i class="b-buy" style="width:${pc(buy)}%"></i>`:'')+
+    `</span>`;
 }
 // Called from the periodic tick: rebuild rows only if the build genuinely changed
 // AND the user isn't interacting with the editor; otherwise just tick the dots.
@@ -1081,7 +1137,7 @@ function renderRows(){
     const acqOpts = ACQ.map(a=>opt(a,a,m.acquisition)).join('');
     const st = (recon[i]||{}).status || 'none';
     return `<tr data-idx="${i}">`+
-      `<td><span class="st-dot st-${st}" title="${st}"></span></td>`+
+      `<td class="stcell">${stBadge(st)}</td>`+
       `<td>${sel('category',i,catOpts,m.category)}</td>`+
       `<td>${sel('type',i,typeOpts,m.type,'—')}</td>`+
       `<td>${sel('class',i,clsOpts,m.class,'')}</td>`+
@@ -1093,6 +1149,7 @@ function renderRows(){
       `<td>${sel('acquisition',i,acqOpts,m.acquisition)}</td>`+
       `<td><button class="xbtn" data-remove="${i}">✕</button></td></tr>`;
   }).join('');
+  renderReconSummary();
   _lastRowSig = rowSig();
 }
 
@@ -1263,18 +1320,24 @@ function renderSaved(list){
   if(list.some(b=>b.slug===cur)) s.value=cur;
 }
 
+let _swMp = null;  // last material plan, so the hide-ready toggle can re-render
 function renderMaterials(mp){
   const card=$('swMatCard');
   if(!mp || !sw.build || !mp.materials.length){ card.style.display='none'; return; }
+  _swMp = mp;
   card.style.display='block';
   $('swMatSummary').textContent = `— ${mp.readyCount}/${mp.total} ready · ${mp.totalMissing} units short of ${mp.totalNeeded}`;
-  $('swMatRows').innerHTML = mp.materials.map(m=>{
-    const color = m.missing>0 ? 'var(--gold)' : 'var(--green)';
-    return `<tr><td>${esc(m.name)}</td><td class="muted">${esc(m.category||'')}</td>`+
+  const pct = mp.total ? Math.round(mp.readyCount/mp.total*100) : 0;
+  $('swMatBar').style.width = pct+'%';
+  const hideReady = $('swMatHideReady') && $('swMatHideReady').checked;
+  const rows = mp.materials.filter(m=> !(hideReady && m.missing<=0));
+  $('swMatRows').innerHTML = rows.map(m=>{
+    const short = m.missing>0;
+    return `<tr class="${short?'mat-short':'mat-ready'}"><td>${esc(m.name)}</td><td class="muted">${esc(m.category||'')}</td>`+
       `<td class="r">${m.needed}</td><td class="r">${m.owned}</td>`+
-      `<td class="r" style="color:${color};font-weight:700">${m.missing||'✓'}</td>`+
+      `<td class="r">${short? m.missing : '✓'}</td>`+
       `<td class="muted" style="font-size:.72rem">${esc((m.usedBy||[]).join(', '))}</td></tr>`;
-  }).join('');
+  }).join('') || '<tr><td colspan="6" class="muted" style="padding:.6rem">Everything for this build is in stock. ✓</td></tr>';
   $('swUnmapped').textContent = mp.unmapped.length ? ('No recipe for: '+mp.unmapped.join('; ')) : '';
 }
 
@@ -1985,6 +2048,7 @@ miningTick(); setInterval(miningTick, 1500);
 exoPrefill(); exoTick(); setInterval(exoTick, 2000);
 guardianTick(); setInterval(guardianTick, 3000);
 engmatTick(); setInterval(engmatTick, 3000);
+$('swMatHideReady').addEventListener('change', ()=>{ if(_swMp) renderMaterials(_swMp); });
 loadShips(); loadPresetList(); shipwrightTick(); setInterval(shipwrightTick, 2500);
 eddTick(); setInterval(eddTick, 15000);
 
