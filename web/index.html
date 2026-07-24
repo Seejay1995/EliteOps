@@ -1639,11 +1639,12 @@ async function systemTick(){
   let d;
   try{ d=await jget('/api/system'); }catch(e){ return; }
   const banner=$('sysBanner');
-  const bc = d.body_count!=null ? `${d.scanned}/${d.body_count} scanned` : (d.scanned?`${d.scanned} scanned`:'');
+  const bc = d.body_count!=null ? `${d.scanned}/${d.body_count} bodies` : (d.scanned?`${d.scanned} bodies`:'');
+  const you = d.scanned ? ` · you scanned ${d.scanned_by_me||0}` : '';
   const worth = d.total_value ? ' · ~'+cr(d.total_value)+' cr' : '';
   if(d.undiscovered){ banner.className='banner undisc'; banner.innerHTML=`★ ${esc(d.system||'?')} — UNDISCOVERED SYSTEM<small>${bc}${worth}</small>`; }
-  else if(d.scanned){ banner.className='banner some'; banner.innerHTML=`${esc(d.system||'?')}<small>${bc}${worth}</small>`; }
-  else { banner.className='banner none'; banner.innerHTML=`${esc(d.system||'No system')}<small>honk (discovery scanner) to reveal bodies</small>`; }
+  else if(d.scanned){ banner.className='banner some'; banner.innerHTML=`${esc(d.system||'?')}<small>${bc}${you}${worth}</small>`; }
+  else { banner.className='banner none'; banner.innerHTML=`${esc(d.system||'No system')}<small>honk (discovery scanner) to reveal bodies — pulling known bodies from EDSM…</small>`; }
 
   const vb = d.bodies.filter(b=>b.value).length;
   $('sysStats').innerHTML = d.scanned ?
@@ -1678,9 +1679,10 @@ async function systemTick(){
       b.rings?'<span class="sb ring">◍ RING</span>':''
     ].join('');
     const det = sysOpen.has(b.id) ? sysDetail(b) : '';
-    return `<div class="sys-body" style="padding-left:${.3+b.depth*1.3}rem" onclick="sysToggleBody(${b.id})">`+
+    const edsm = b.personally_scanned===false;
+    return `<div class="sys-body" style="padding-left:${.3+b.depth*1.3}rem${edsm?';opacity:.72':''}" onclick="sysToggleBody(${b.id})" title="${edsm?'Known from EDSM — FSS-scan it yourself to confirm & claim':''}">`+
       `<span class="sys-disc c-${b.category}"></span>`+
-      `<span class="bn">${esc(shortName)} <small>${esc(b.kind)}</small></span>`+
+      `<span class="bn">${edsm?'<span class="muted" title="from EDSM">◇ </span>':''}${esc(shortName)} <small>${esc(b.kind)}</small></span>`+
       `<span class="sys-badges">${badges}</span>`+
       `<span class="bd">${b.distance_ls!=null?Math.round(b.distance_ls).toLocaleString()+' ls':''}</span>`+
       `<span class="bv">${b.value?cr(b.value):''}</span></div>`+det;

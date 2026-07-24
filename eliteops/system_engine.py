@@ -16,6 +16,8 @@ from typing import Any
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "vendor"))
 import firsts  # noqa: E402
 
+from . import edsm_client  # noqa: E402
+
 
 # raw surface-material grades (the 7×4 grid). G4 = rarest/most useful for engineering.
 _RAW_GRADE = {
@@ -43,6 +45,52 @@ def _clean(v: Any) -> str:
     if s.startswith("$") and s.endswith(";"):
         s = s[1:-1]
     return s.replace("Ring_Level_", "").replace("Resources", " Resources").strip()
+
+
+# EDSM subType -> the PlanetClass string the value formula + _category expect
+def _edsm_planet_class(sub: str) -> str:
+    s = str(sub or "").lower()
+    if "earth-like" in s:
+        return "Earthlike body"
+    if "water world" in s:
+        return "Water world"
+    if "ammonia world" in s:
+        return "Ammonia world"
+    if "water giant" in s:
+        return "Water giant"
+    if "gas giant" in s or "class i" in s or "class ii" in s or "class iii" in s \
+            or "class iv" in s or "class v" in s or s.endswith("life"):
+        for roman in ("v", "iv", "iii", "ii", "i"):
+            if f"class {roman} " in s or s.endswith(f"class {roman}"):
+                return f"Sudarsky class {roman.upper()} gas giant"
+        return "Sudarsky class I gas giant"
+    if "metal-rich" in s or "metal rich" in s:
+        return "Metal rich body"
+    if "high metal content" in s:
+        return "High metal content body"
+    if "rocky ice" in s:
+        return "Rocky ice body"
+    if "rocky" in s:
+        return "Rocky body"
+    if "icy" in s:
+        return "Icy body"
+    return "Rocky body"
+
+
+def _edsm_star_type(sub: str) -> str:
+    s = str(sub or "").lower()
+    if "neutron" in s:
+        return "N"
+    if "black hole" in s:
+        return "H"
+    if "white dwarf" in s or s.startswith("d"):
+        return "D"
+    first = str(sub or "").strip()[:1].upper()
+    return first if first.isalpha() else "G"
+
+
+_EDSM_RING = {"metal rich": "metalrich", "metalrich": "metalrich", "metallic": "metalic",
+              "metalic": "metalic", "icy": "icy", "rocky": "rocky"}
 
 
 def _category(planet_class: str, star: bool, star_type: str) -> str:
@@ -79,6 +127,7 @@ class SystemEngine:
         self._addr: Any = None
         self._body_count: int | None = None
         self._bodies: dict[int, dict] = {}
+        self._edsm_fetched: set = set()
         state.add_journal_listener(self.on_journal)
 
     def on_journal(self, e: dict) -> None:
@@ -90,9 +139,11 @@ class SystemEngine:
                     self._addr = e.get("SystemAddress")
                     self._body_count = None
                     self._bodies = {}
+                self._ensure_edsm(self._system, self._addr)
             elif ev == "FSSDiscoveryScan":
                 if e.get("SystemAddress") in (None, self._addr):
                     self._body_count = e.get("BodyCount")
+                    self._ensure_edsm(self._system, self._addr)
             elif ev == "Scan":
                 self._scan(e)
             elif ev in ("SAASignalsFound", "FSSBodySignals"):
@@ -179,6 +230,105 @@ class SystemEngine:
             "gravity": e.get("SurfaceGravity"), "temperature": e.get("SurfaceTemperature"),
             "surface_pressure": e.get("SurfacePressure"),
             "mass": mass, "radius": e.get("Radius"),
+            "personally_scanned": True,
+        }
+
+    # --- EDSM populate-on-honk (so bodies appear like EDD, before you FSS) --
+    def _ensure_edsm(self, system: str | None, addr: Any) -> None:
+        if not system or addr in self._edsm_fetched:
+            return
+        self._edsm_fetched.add(addr)
+        threading.Thread(target=self._fetch_edsm, args=(system, addr),
+                         name="eliteops-system-edsm", daemon=True).start()
+
+    def _fetch_edsm(self, system: str, addr: Any) -> None:
+        try:
+            data = edsm_client.system_bodies(system)
+        except Exception:  # noqa: BLE001
+            data = None
+        if not data:
+            return
+        with self._lock:
+            if addr != self._addr:
+                return  # jumped away while fetching
+            if data.get("bodyCount") and not self._body_count:
+                self._body_count = data.get("bodyCount")
+            for b in data.get("bodies") or []:
+                bid = b.get("bodyId")
+                if bid is None:
+                    continue
+                existing = self._bodies.get(bid)
+                if existing and existing.get("personally_scanned"):
+                    continue  # never clobber a body you actually scanned
+                body = self._edsm_to_body(b)
+                if body:
+                    self._bodies[bid] = body
+
+    def _edsm_to_body(self, b: dict) -> dict | None:
+        sub = b.get("subType") or ""
+        star = str(b.get("type")) == "Star"
+        star_type = _edsm_star_type(sub) if star else ""
+        planet_class = "" if star else _edsm_planet_class(sub)
+        mass = b.get("solarMasses") if star else b.get("earthMasses")
+        terraform = str(b.get("terraformingState") or "") in ("Candidate for terraforming", "Terraformable")
+        value = None
+        try:
+            if mass is not None:
+                value = (firsts.star_scan_value(star_type, mass, False) if star
+                         else firsts.planet_claim_value(planet_class, terraform, mass, False, False))
+        except Exception:  # noqa: BLE001
+            value = None
+        parent = None
+        for p in b.get("parents") or []:
+            for kind, pid in p.items():
+                if kind in ("Star", "Planet"):
+                    parent = pid
+                    break
+            if parent is not None:
+                break
+        materials = []
+        for nm, pct in (b.get("materials") or {}).items():
+            key = str(nm).lower()
+            grade = _RAW_GRADE.get(key)
+            materials.append({"name": nm, "percent": round(float(pct or 0), 1),
+                              "grade": grade, "rare": bool(grade and grade >= 3)})
+        materials.sort(key=lambda x: (-(x["grade"] or 0), -x["percent"]))
+        sc = b.get("solidComposition") or {}
+        composition = ({"ice": round(sc.get("Ice", 0)), "rock": round(sc.get("Rock", 0)),
+                        "metal": round(sc.get("Metal", 0))} if sc else None)
+        atmos = [{"name": k, "percent": round(float(v or 0), 1)}
+                 for k, v in (b.get("atmosphereComposition") or {}).items()]
+        rings_detail, ring_ct = [], 0
+        for r in b.get("rings") or []:
+            if "Belt" in str(r.get("type", "")) or "Belt" in str(r.get("name", "")):
+                continue
+            ring_ct += 1
+            rc = _EDSM_RING.get(str(r.get("type") or "").lower(), "")
+            rings_detail.append({"name": " ".join(str(r.get("name") or "").split()[-2:]),
+                                 "ring_class": rc, "hint": _RING_HINT.get(rc, ""),
+                                 "mass_mt": r.get("mass")})
+        atm_type = b.get("atmosphereType") or ""
+        volc = b.get("volcanismType") or ""
+        return {
+            "id": b.get("bodyId"), "name": b.get("name", ""), "parent": parent,
+            "star": star, "star_type": star_type, "planet_class": planet_class,
+            "category": _category(planet_class, star, star_type),
+            "kind": sub or ("star" if star else "body"),
+            "distance_ls": b.get("distanceToArrival"), "value": value,
+            "landable": bool(b.get("isLandable")), "terraformable": terraform,
+            "terraform_state": b.get("terraformingState") or "",
+            "discovered": True, "mapped": False, "mapped_by_me": False,
+            "bio_signals": 0, "geo_signals": 0,
+            "rings": ring_ct, "rings_detail": rings_detail, "reserve_level": "",
+            "atmosphere": "" if atm_type in ("", "No atmosphere") else atm_type,
+            "atmosphere_composition": atmos,
+            "volcanism": "" if volc in ("", "No volcanism") else volc,
+            "materials": materials, "has_rare_mat": any(m["rare"] for m in materials),
+            "composition": composition,
+            "gravity": b.get("gravity"), "temperature": b.get("surfaceTemperature"),
+            "surface_pressure": (b.get("surfacePressure") or 0) * 101325 if b.get("surfacePressure") else None,
+            "mass": mass, "radius": (b.get("radius") or 0) * 1000 if b.get("radius") else None,
+            "personally_scanned": False,
         }
 
     def _signals(self, e: dict) -> None:
@@ -234,6 +384,7 @@ class SystemEngine:
                 walk(r["id"], 1, guard)
 
             scanned = len(bodies)
+            scanned_by_me = sum(1 for b in bodies.values() if b.get("personally_scanned"))
             total_value = sum(b.get("value") or 0 for b in bodies.values())
             named = [b for b in bodies.values() if b.get("name")]
             undiscovered = bool(named) and all(not b.get("discovered", True) for b in named)
@@ -263,6 +414,7 @@ class SystemEngine:
                 })
             return {
                 "system": self._system, "body_count": self._body_count,
-                "scanned": scanned, "total_value": total_value,
+                "scanned": scanned, "scanned_by_me": scanned_by_me,
+                "total_value": total_value,
                 "undiscovered": undiscovered, "highlights": highlights, "bodies": ordered,
             }
