@@ -1,0 +1,34 @@
+{
+  "schema": "eliteops.shipbuild/1",
+  "name": "Krait Phantom — Material Collector",
+  "ship": "krait_phantom",
+  "role": "Material Collection / SRV",
+  "notes": "Medium, nimble, strong-in-gravity mat runner. SRV bay for surface raw prospecting, Wake Scanner for encoded data, heat sinks for HGE diving. No cargo focus — mats go to material storage. Dirty G5 thrusters give the thrust-to-weight for high-g landings.",
+  "search": { "referenceSystem": "", "useCurrentSystem": true, "radiusLy": 60, "requireLargePad": false, "includeFleetCarriers": false },
+  "rollProfile": { "1": 1, "2": 2, "3": 4, "4": 6, "5": 10 },
+  "modules": [
+    { "slot": "PowerPlant",       "category": "core", "type": "Power Plant",       "class": 7, "rating": "A", "blueprint": "Low Emissions",   "grade": 5, "experimental": "Thermal Spread", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "MainEngines",      "category": "core", "type": "Thrusters",         "class": 6, "rating": "A", "blueprint": "Dirty",          "grade": 5, "experimental": "Drag Drives",    "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "FrameShiftDrive",  "category": "core", "type": "Frame Shift Drive", "class": 5, "rating": "A", "blueprint": "Increased Range","grade": 5, "experimental": "Mass Manager",   "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "LifeSupport",      "category": "core", "type": "Life Support",      "class": 4, "rating": "D", "blueprint": "Lightweight",    "grade": 4, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "PowerDistributor", "category": "core", "type": "Power Distributor", "class": 7, "rating": "A", "blueprint": "Engine Focused", "grade": 3, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Radar",           "category": "core", "type": "Sensors",           "class": 6, "rating": "D", "blueprint": "Lightweight",    "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "FuelTank",        "category": "core", "type": "Fuel Tank",         "class": 5, "rating": "C", "quantity": 1, "acquisition": "StandardOutfitting" },
+
+    { "slot": "Utility1", "category": "utility", "type": "Frame Shift Wake Scanner", "class": 0, "rating": "C", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility2", "category": "utility", "type": "Heat Sink Launcher",       "class": 0, "rating": "I", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility3", "category": "utility", "type": "Heat Sink Launcher",       "class": 0, "rating": "I", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility4", "category": "utility", "type": "Shield Booster",           "class": 0, "rating": "A", "blueprint": "Heavy Duty", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+
+    { "slot": "Slot01_Size6", "category": "optional", "type": "Fuel Scoop",                 "class": 6, "rating": "A", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot02_Size5", "category": "optional", "type": "Bi Weave Shield Generator",  "class": 5, "rating": "C", "blueprint": "Reinforced", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot03_Size5", "category": "optional", "type": "Planetary Vehicle Hangar",   "class": 4, "rating": "H", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot04_Size5", "category": "optional", "type": "Hull Reinforcement Package", "class": 5, "rating": "D", "blueprint": "Heavy Duty", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot05_Size3", "category": "optional", "type": "Auto Field Maintenance Unit","class": 3, "rating": "A", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot06_Size3", "category": "optional", "type": "Hull Reinforcement Package", "class": 3, "rating": "D", "blueprint": "Heavy Duty", "grade": 3, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot07_Size3", "category": "optional", "type": "Shield Cell Bank",           "class": 3, "rating": "A", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot08_Size2", "category": "optional", "type": "Cargo Rack",                 "class": 2, "rating": "E", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot09_Size1", "category": "optional", "type": "Detailed Surface Scanner",   "class": 1, "rating": "I", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot10_Size1", "category": "optional", "type": "Planetary Approach Suite",   "quantity": 1, "acquisition": "StandardOutfitting" }
+  ]
+}
