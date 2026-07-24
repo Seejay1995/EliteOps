@@ -144,51 +144,23 @@ class GuardianEngine:
         threading.Thread(target=self._run_broker, name="eliteops-guardian-broker", daemon=True).start()
 
     def _run_broker(self) -> None:
+        # Inara is the source, NOT Spansh. Spansh's per-station `services` list is
+        # empty for most stations, so filtering on "Technology Broker" there dropped
+        # every result. Inara crowd-sources the real service list and even tags the
+        # broker type, so we ask it directly for the nearest GUARDIAN tech brokers.
         try:
+            from . import inara_client
             ref = self.state.snapshot().get("system")
             if not ref:
                 raise ValueError("No reference system — jump in-game first.")
-            # Spansh's `services` FILTER is ignored (returns all stations), so we scan
-            # nearby dockable stations and keep only those whose returned services array
-            # actually lists "Technology Broker" — this is accurate and drops the false
-            # positives (stale colony outposts, parked fleet carriers). Widen the radius
-            # since real brokers sit back toward the bubble from Guardian regions.
-            # EDCD rule: a Tech Broker is GUARDIAN when the station's PRIMARY *or* SECONDARY
-            # economy is High Tech. Spansh ignores the services filter but honours
-            # primary_economy / secondary_economy, so query BOTH (near colony space the
-            # Guardian brokers are usually secondary-High-Tech), merge, and keep only the
-            # ones whose returned services actually list a Technology Broker.
-            stops, used_radius = [], None
-            for radius in (200, 600, 2000):
-                seen, merged = set(), []
-                for econ_key in ("primary_economy", "secondary_economy"):
-                    body = {"filters": {"distance": {"min": "0", "max": str(radius)},
-                                        "type": {"value": spansh_client._ACQUIRE_STATION_TYPES},
-                                        econ_key: {"value": ["High Tech"]}},
-                            "sort": [{"distance": {"direction": "asc"}}],
-                            "reference_system": ref, "size": 30}
-                    data = spansh_client._jpost("/stations/search", body, timeout=30)
-                    for s in (data.get("results") if isinstance(data, dict) else []) or []:
-                        services = {x.get("name") for x in (s.get("services") or [])}
-                        if "Technology Broker" not in services:
-                            continue
-                        name = str(s.get("name") or "")
-                        if "Carrier" in str(s.get("type") or "") or name.startswith("$"):
-                            continue
-                        key = (s.get("system_name"), name)
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        merged.append({"system": s.get("system_name"), "station": name,
-                                       "distance_ly": s.get("distance"), "distance_ls": s.get("distance_to_arrival"),
-                                       "type": s.get("type"), "large_pad": s.get("has_large_pad")})
-                merged.sort(key=lambda x: x["distance_ly"] if x["distance_ly"] is not None else 1e9)
-                stops, used_radius = merged[:8], radius
-                if stops:
-                    break
+            stops = []
+            for s in inara_client.nearest_stations(ref, "broker_guardian", limit=8):
+                stops.append({"system": s.get("system"), "station": s.get("station"),
+                              "distance_ly": s.get("distance_ly"), "distance_ls": s.get("station_dist_ls"),
+                              "economy": s.get("economy"), "allegiance": s.get("allegiance")})
             with self._lock:
                 self._broker = {"status": "ready", "stops": stops, "error": "",
-                                "reference": ref, "radius": used_radius}
+                                "reference": ref, "source": "inara"}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
                 self._broker = {"status": "error", "stops": [], "error": str(exc)}

@@ -635,11 +635,11 @@
         <div class="card">
           <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
             <h2 style="font-size:1rem;margin:0">Nearest Material Traders</h2>
-            <button class="btn" id="emTradersBtn" style="padding:.4rem .8rem">Find (Spansh)</button>
+            <button class="btn" id="emTradersBtn" style="padding:.4rem .8rem">Find (Inara)</button>
             <span class="muted" id="emTradersStatus" style="font-size:.82rem"></span>
           </div>
           <div class="muted" id="emTraderInfo" style="font-size:.78rem;margin-top:.4rem"></div>
-          <div class="muted" style="font-size:.72rem;margin-top:.25rem"><i>Trader <b>type</b> is exact (Frontier's economy rule); Spansh can't confirm a trader is present, so verify on arrival.</i></div>
+          <div class="muted" style="font-size:.72rem;margin-top:.25rem"><i>Live from <b>Inara</b>'s crowd-sourced station data — these stations actually have the trader, already sorted by type. Data can lag reality, so verify on arrival.</i></div>
           <div id="emTraders" style="margin-top:.6rem"></div>
         </div>
         <div id="emGuide"></div>
@@ -1424,14 +1424,14 @@ function renderMarkets(markets){
   }).join('');
 }
 $('gBrokerBtn').addEventListener('click', async()=>{
-  $('gBrokerStatus').textContent='◷ searching Spansh…';
+  $('gBrokerStatus').textContent='◷ searching Inara…';
   try{ await fetch('/api/guardian/broker',{method:'POST'}); }catch(e){}
   for(let i=0;i<30;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/guardian'); renderBroker(d.broker); if((d.broker||{}).status!=='searching') break; }
 });
 function renderBroker(b){
   if(!b) return;
   const st=$('gBrokerStatus');
-  if(b.status==='searching'){ st.textContent='◷ searching Spansh…'; return; }
+  if(b.status==='searching'){ st.textContent='◷ searching Inara…'; return; }
   if(b.status==='error'){ st.textContent='⚠ '+b.error; $('gBrokerStops').innerHTML=''; return; }
   if(b.status==='ready'){
     st.textContent = `from ${b.reference||'?'} · ${b.stops.length} broker(s)`;
@@ -1768,7 +1768,7 @@ async function systemTick(){
 /* ---- engineering materials ---- */
 const EM_COL={orange:'var(--orange)',gold:'var(--gold)',cyan:'var(--cyan)'};
 $('emTradersBtn').addEventListener('click', async()=>{
-  $('emTradersStatus').textContent='◷ searching Spansh…';
+  $('emTradersStatus').textContent='◷ searching Inara…';
   try{ await fetch('/api/engmat/traders',{method:'POST'}); }catch(e){}
   for(let i=0;i<25;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/engmat'); renderTraders(d.traders); if((d.traders||{}).status!=='searching') break; }
 });
@@ -1782,7 +1782,7 @@ function traderGroup(title,rows,col){
 function renderTraders(t){
   if(!t) return;
   const st=$('emTradersStatus');
-  if(t.status==='searching'){ st.textContent='◷ searching Spansh…'; return; }
+  if(t.status==='searching'){ st.textContent='◷ searching Inara…'; return; }
   if(t.status==='error'){ st.textContent='⚠ '+t.error; return; }
   if(t.status==='ready'){
     st.textContent='from '+(t.reference||'?');

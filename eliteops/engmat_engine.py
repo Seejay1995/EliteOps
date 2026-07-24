@@ -200,29 +200,28 @@ class EngMatEngine:
         threading.Thread(target=self._run_traders, name="eliteops-traders", daemon=True).start()
 
     def _run_traders(self) -> None:
+        # Inara is the source here, NOT Spansh: Spansh's per-station `services`
+        # list is empty for most stations, so its "Material Trader" filter just
+        # returns economy-matched stations that usually have no trader. Inara
+        # crowd-sources the real service list AND the trader type (Raw/Mfd/Enc).
         try:
+            from . import inara_client
             ref = self.state.snapshot().get("system")
             if not ref:
                 raise ValueError("No reference system — jump in-game first.")
-            body = {"filters": {"distance": {"min": "0", "max": "150"},
-                                "services": {"value": ["Material Trader"]},
-                                "type": {"value": spansh_client._ACQUIRE_STATION_TYPES}},
-                    "sort": [{"distance": {"direction": "asc"}}],
-                    "reference_system": ref, "size": 30}
-            data = spansh_client._jpost("/stations/search", body, timeout=30)
-            groups: dict[str, list] = {"raw": [], "manufactured": [], "encoded": [], "other": []}
-            for s in (data.get("results") if isinstance(data, dict) else []) or []:
-                if "Carrier" in str(s.get("type") or ""):
-                    continue
-                econ = s.get("primary_economy") or s.get("economy") or ""
-                kind = _mat_trader_type(s.get("primary_economy"), s.get("secondary_economy")) or "other"
-                row = {"system": s.get("system_name"), "station": s.get("name"),
-                       "distance_ly": s.get("distance"), "distance_ls": s.get("distance_to_arrival"),
-                       "economy": econ, "large_pad": s.get("has_large_pad")}
-                if len(groups[kind]) < 3:
-                    groups[kind].append(row)
+            svc = {"raw": "material_raw", "manufactured": "material_manufactured",
+                   "encoded": "material_encoded"}
+            groups: dict[str, list] = {"raw": [], "manufactured": [], "encoded": []}
+            for kind, service in svc.items():
+                for s in inara_client.nearest_stations(ref, service, limit=3):
+                    groups[kind].append({
+                        "system": s.get("system"), "station": s.get("station"),
+                        "distance_ly": s.get("distance_ly"), "distance_ls": s.get("station_dist_ls"),
+                        "economy": s.get("economy"), "allegiance": s.get("allegiance"),
+                    })
             with self._lock:
-                self._traders = {"status": "ready", "results": groups, "error": "", "reference": ref}
+                self._traders = {"status": "ready", "results": groups, "error": "",
+                                 "reference": ref, "source": "inara"}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
                 self._traders = {"status": "error", "results": {}, "error": str(exc)}
