@@ -261,6 +261,43 @@
   .matbar{height:.5rem;border-radius:999px;background:var(--bg);border:1px solid var(--line);overflow:hidden;margin:.5rem 0 .2rem}
   .matbar i{display:block;height:100%;background:var(--green)}
   tr.mat-ready{opacity:.5} tr.mat-short td:nth-child(5){color:var(--gold);font-weight:700}
+  /* shipwright sub-tabs */
+  .sw-head{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;margin-bottom:.9rem}
+  .sw-subtabs{display:flex;gap:.35rem}
+  .sw-subtab{background:var(--panel2);border:1px solid var(--line);color:var(--dim);border-radius:.5rem;
+    padding:.45rem 1rem;cursor:pointer;font-family:inherit;font-size:.92rem;font-weight:600}
+  .sw-subtab:hover{color:var(--text)}
+  .sw-subtab.active{color:#1a1103;background:var(--orange);border-color:var(--orange)}
+  .sw-buildchip{color:var(--gold);font-size:.85rem;font-weight:600}
+  .sw-sub{display:none} .sw-sub.active{display:block;animation:fade .18s ease}
+  /* compare diff */
+  .cmp-banner{background:rgba(255,123,0,.1);border:1px solid var(--orange);color:var(--gold);
+    border-radius:.5rem;padding:.5rem .8rem;margin-bottom:.8rem;font-size:.86rem}
+  .cmp-group{margin-bottom:1.2rem}
+  .cmp-gh{text-transform:uppercase;letter-spacing:.08em;font-size:.74rem;color:var(--gold);font-weight:700;
+    margin:.2rem 0 .3rem;border-bottom:1px solid var(--line);padding-bottom:.28rem}
+  .cmp-row{display:grid;grid-template-columns:1fr 7rem 1fr;align-items:center;gap:.6rem;
+    padding:.5rem .5rem;border-bottom:1px solid var(--line);font-size:1.05rem}
+  .cmp-side{display:flex;gap:.5rem;align-items:baseline;min-width:0}
+  .cmp-side.ship{justify-content:flex-end;text-align:right}
+  .cmp-side .cr{font-weight:800;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+  .cmp-side .nm{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cmp-side em{font-style:normal;font-size:.82rem;color:var(--cyan);white-space:nowrap}
+  .cmp-side .none{color:var(--dim);font-style:italic;font-size:.9rem}
+  .cmp-mid{display:flex;flex-direction:column;align-items:center;gap:.1rem}
+  .cmp-glyph{font-size:1.25rem;line-height:1}
+  .cmp-slot{font-size:.64rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;text-align:center}
+  .cmp-match .cmp-glyph{color:var(--green)}
+  .cmp-needs-engineering .cmp-glyph{color:var(--cyan)}
+  .cmp-needs-engineering .cmp-side.build em{color:var(--cyan)}
+  .cmp-swap{background:rgba(255,123,0,.06)} .cmp-swap .cmp-glyph{color:var(--orange)}
+  .cmp-needs-buy .cmp-glyph{color:var(--gold)} .cmp-needs-buy .cmp-side.build .cr{color:var(--gold)}
+  .cmp-extra{opacity:.65} .cmp-extra .cmp-glyph{color:var(--dim)}
+  @media (max-width:680px){
+    .cmp-row{grid-template-columns:1fr;gap:.1rem;padding:.55rem .3rem}
+    .cmp-side.ship{justify-content:flex-start;text-align:left}
+    .cmp-mid{flex-direction:row;gap:.4rem;justify-content:flex-start}
+  }
   .xbtn{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:.3rem;cursor:pointer;padding:.1rem .4rem;font-family:inherit}
   .sw-import{width:100%;min-height:6rem;background:var(--bg);border:1px solid var(--line);color:var(--text);
     border-radius:.4rem;padding:.5rem;font-family:inherit;font-size:.78rem;display:none}
@@ -475,14 +512,26 @@
         </div>
       </section>
       <section class="view" id="view-ship">
-        <h2>Shipwright</h2>
-        <div class="card">
-          <div class="sw-eyebrow">Your ship — live in-game</div>
-          <div class="sw-shipname" id="swShipName">–</div>
-          <div class="muted" id="swShipMeta" style="font-size:.82rem"></div>
-          <div class="matbar" id="swMats"></div>
-          <div class="sw-mods" id="swMods"></div>
+        <div class="sw-head">
+          <h2 style="margin:0">Shipwright</h2>
+          <div class="sw-subtabs">
+            <button class="sw-subtab active" data-sub="compare">Compare</button>
+            <button class="sw-subtab" data-sub="edit">Edit</button>
+            <button class="sw-subtab" data-sub="done">Get it done</button>
+          </div>
+          <span style="flex:1"></span>
+          <span class="sw-buildchip" id="swBuildChip">No build open</span>
         </div>
+
+        <!-- ============ COMPARE (hero) ============ -->
+        <div class="sw-sub active" id="sub-compare">
+          <div class="recon-sum" id="swCmpSummary"></div>
+          <div id="swCmpBanner"></div>
+          <div id="swCompare"><div class="muted" style="padding:1rem">Load or start a build (in <b>Edit</b>) to compare it against your ship.</div></div>
+        </div>
+
+        <!-- ============ EDIT ============ -->
+        <div class="sw-sub" id="sub-edit">
         <div class="card">
           <div class="sw-eyebrow">Build plan — the loadout you're working toward</div>
           <div class="sw-shipname" id="swBuildTitle" style="font-size:1.05rem">No build open</div>
@@ -515,6 +564,16 @@
           </div>
           <div class="muted" id="swEmpty" style="font-size:.82rem;margin-top:.5rem">Pick a hull or load a preset to start a build. Dropdowns filter by type — Hardpoint shows only weapons.</div>
         </div>
+        <details class="card">
+          <summary class="sw-eyebrow" style="cursor:pointer">Your live in-game loadout <span class="sw-shipname" id="swShipName" style="font-size:1rem">–</span></summary>
+          <div class="muted" id="swShipMeta" style="font-size:.82rem;margin-top:.4rem"></div>
+          <div class="matbar" id="swMats"></div>
+          <div class="sw-mods" id="swMods"></div>
+        </details>
+        </div><!-- /sub-edit -->
+
+        <!-- ============ GET IT DONE ============ -->
+        <div class="sw-sub" id="sub-done">
         <div class="card" id="swMatCard" style="display:none">
           <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
             <h2 style="font-size:1rem;margin:0">Materials to finish this build <small class="muted" id="swMatSummary"></small></h2>
@@ -543,6 +602,7 @@
           </div>
           <div id="swAcqStops" style="margin-top:.6rem"></div>
         </div>
+        </div><!-- /sub-done -->
       </section>
       <section class="view" id="view-system">
         <h2>System Scan</h2>
@@ -1241,7 +1301,7 @@ async function shipwrightTick(){
     sw.build = d.build; $('swBuildName').value = d.build.name||'';
     if(d.build.ship) $('swHull').value = d.build.ship;
   }
-  if(!sw.snap || !sw.build) sw.snap = d; else sw.snap.reconciliation = d.reconciliation;
+  if(!sw.snap || !sw.build) sw.snap = d; else { sw.snap.reconciliation = d.reconciliation; sw.snap.comparison = d.comparison; }
   const cs=d.current_ship;
   $('swShipName').textContent = cs ? cs.name : 'No ship loadout yet';
   $('swShipMeta').textContent = cs ? `${cs.ident||''} · jump ${cs.max_jump!=null?cs.max_jump.toFixed(1):'?'} ly · cargo ${cs.cargo_capacity||0}t · ${cs.modules.length} modules · rebuy ${cr(cs.rebuy)} cr` : '';
@@ -1257,6 +1317,79 @@ async function shipwrightTick(){
   renderEngineers(d.engineer_plan||[]);
   renderAcquisition(d.acquisition||{});
   if(sw.build) refreshRowsLive();
+  renderCompare(d.comparison);
+  $('swBuildChip').textContent = (sw.build && sw.build.name) ? (sw.build.name + (d.comparison && d.comparison.hull_name ? '  ·  '+d.comparison.hull_name : '')) : 'No build open';
+}
+
+/* ---- shipwright: sub-tabs + slot-by-slot compare ---- */
+document.querySelectorAll('.sw-subtab').forEach(t=>t.addEventListener('click',()=>{
+  document.querySelectorAll('.sw-subtab').forEach(x=>x.classList.toggle('active',x===t));
+  const s=t.dataset.sub;
+  document.querySelectorAll('.sw-sub').forEach(v=>v.classList.toggle('active', v.id==='sub-'+s));
+}));
+const CMP_META = {
+  'match':{i:'✓',t:'you already have this'},
+  'needs-engineering':{i:'⚙',t:'fitted — still needs this engineering'},
+  'swap':{i:'⇄',t:'a different module is fitted here — swap'},
+  'needs-buy':{i:'⛒',t:'not fitted — buy / outfit it'},
+  'extra':{i:'＋',t:'fitted, but the build doesn\'t call for it'},
+};
+// prettify a raw journal blueprint symbol (engine_dirty -> Dirty)
+function prettyBp(s){
+  if(!s) return '';
+  const drop=/^(engine|fsd|hyperdrive|powerplant|power|plant|distributor|powerdistributor|sensor|sensors|armour|shieldgenerator|shield|generator|hullreinforcement|hull|reinforcement|shieldbooster|booster|weapon|misc|lifesupport|life|support)$/i;
+  return String(s).replace(/_/g,' ').replace(/([a-z])([A-Z])/g,'$1 $2').split(' ')
+    .filter(w=>w&&!drop.test(w)).map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' ') || String(s);
+}
+function crLabel(x){
+  if(!x) return '';
+  const c=(x.class!=null?x.class:x.size);
+  return c!=null ? (''+c+(x.rating||'')) : (x.size!=null?'Sz'+x.size:'');
+}
+function cmpSide(x, side){
+  if(!x) return `<div class="cmp-side ${side}"><span class="none">${side==='ship'?'— not fitted —':'—'}</span></div>`;
+  const nm = esc(side==='ship' ? (x.name||'') : (x.type||''));
+  let eng='';
+  if(side==='ship' && x.engineering) eng=`<em>${esc(prettyBp(x.engineering.blueprint))}${x.engineering.grade?' G'+x.engineering.grade:''}${x.engineering.experimental?' ·+':''}</em>`;
+  if(side==='build' && x.blueprint) eng=`<em>${esc(prettyBp(x.blueprint))}${x.grade?' G'+x.grade:''}${x.experimental?' · '+esc(x.experimental):''}</em>`;
+  const cr=`<span class="cr">${esc(crLabel(x))}</span>`, name=`<span class="nm">${nm}</span>`;
+  return `<div class="cmp-side ${side}">${side==='ship'? eng+name+cr : cr+name+eng}</div>`;
+}
+function renderCmpSummary(rollup){
+  const el=$('swCmpSummary'); if(!el) return;
+  if(!rollup){ el.innerHTML=''; return; }
+  const tot=rollup.total||1, pc=n=>Math.round(n/tot*100);
+  const pill=(cls,ic,n,lbl)=> n?`<span class="recon-pill ${cls}">${ic} <b>${n}</b> ${lbl}</span>`:'';
+  el.innerHTML =
+    pill('have','✓',rollup.match,'have')+
+    pill('eng','⚙',rollup.needs_engineering,'to engineer')+
+    (rollup.swap?`<span class="recon-pill" style="color:var(--orange)">⇄ <b>${rollup.swap}</b> swap</span>`:'')+
+    pill('buy','⛒',rollup.needs_buy,'to buy')+
+    (rollup.extra?`<span class="recon-pill" style="color:var(--dim)">＋ <b>${rollup.extra}</b> extra</span>`:'')+
+    `<span class="recon-bar">`+
+      (rollup.match?`<i class="b-have" style="width:${pc(rollup.match)}%"></i>`:'')+
+      (rollup.needs_engineering?`<i class="b-eng" style="width:${pc(rollup.needs_engineering)}%"></i>`:'')+
+      (rollup.needs_buy?`<i class="b-buy" style="width:${pc(rollup.needs_buy)}%"></i>`:'')+
+    `</span>`;
+}
+function renderCompare(cmp){
+  const box=$('swCompare'); if(!box) return;
+  if(!cmp){ box.innerHTML='<div class="muted" style="padding:1rem">Load or start a build (in <b>Edit</b>) to compare it against your ship.</div>';
+    renderCmpSummary(null); $('swCmpBanner').innerHTML=''; return; }
+  renderCmpSummary(cmp.rollup);
+  $('swCmpBanner').innerHTML = cmp.hull_mismatch
+    ? `<div class="cmp-banner">⚠ You're flying a different ship — comparing against the build's hull (<b>${esc(cmp.hull_name||'?')}</b>).</div>`
+    : (!cmp.ship_present ? `<div class="cmp-banner">No live ship loadout yet — everything shows as “to buy”. Fly your ship in-game to compare.</div>` : '');
+  box.innerHTML = ((cmp.groups||[]).map(g=>
+    `<div class="cmp-group"><div class="cmp-gh">${esc(g.label)}</div>`+
+    g.slots.map(s=>{
+      const meta=CMP_META[s.status]||CMP_META['needs-buy'];
+      return `<div class="cmp-row cmp-${s.status}" title="${esc(meta.t)}">`+
+        cmpSide(s.ship,'ship')+
+        `<div class="cmp-mid"><span class="cmp-glyph">${meta.i}</span><span class="cmp-slot">${esc(s.label)}${s.size?' '+s.size:''}</span></div>`+
+        cmpSide(s.build,'build')+`</div>`;
+    }).join('')+`</div>`
+  ).join('')) || '<div class="muted" style="padding:1rem">Nothing to compare.</div>';
 }
 
 function renderEngineers(list){

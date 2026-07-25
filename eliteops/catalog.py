@@ -14,6 +14,10 @@ from typing import Any
 
 _DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
+# ships.json (catalog) core slot name -> journal Loadout `Slot` name. Most match;
+# only these two differ, so the Shipwright slot-comparison can key live modules in.
+CORE_SLOT_TO_JOURNAL: dict[str, str] = {"Thrusters": "MainEngines", "Sensors": "Radar"}
+
 # coriolis module group code -> engineering-recipe "Modules" token(s). Only the
 # genuinely engineerable groups are mapped; anything unmapped simply has no
 # blueprints (fuel tank, docking computer, passenger cabins, most limpets, ...).
@@ -73,6 +77,19 @@ class Catalog:
                 if root and root not in roots:
                     roots[root] = m["grp"]
         self._roots = sorted(roots.items(), key=lambda kv: -len(kv[0]))
+        # exact FDev symbol -> variant record (class = size int, rating = letter,
+        # mass, ...), for recovering a live module's class/rating from its journal
+        # Item symbol. Journal symbols are lowercase; catalog symbols TitleCase.
+        self._variant_by_symbol: dict[str, dict] = {}
+        for m in self._modules:
+            for v in m["variants"]:
+                sym = (v.get("symbol") or "").lower()
+                if sym:
+                    self._variant_by_symbol[sym] = {
+                        "grp": m["grp"], "name": m["name"], "category": m["category"],
+                        "class": v.get("class"), "rating": v.get("rating"),
+                        "mass": v.get("mass"),
+                    }
         # token -> recipes, for blueprints_for()
         self._by_token: dict[str, list[dict]] = {}
         for r in self._recipes:
@@ -121,6 +138,12 @@ class Catalog:
             if root and root in norm:
                 return grp
         return None
+
+    def variant_from_symbol(self, item: str) -> dict | None:
+        """Exact journal `Item` symbol -> variant record {grp, name, category,
+        class(=size int), rating, mass}, or None if the symbol isn't in the
+        catalog (e.g. some SCO/experimental modules) — caller falls back to size."""
+        return self._variant_by_symbol.get((item or "").lower())
 
     def find_module_by_name(self, name: str) -> dict | None:
         """Resolve a free-text module name (e.g. from an imported build) to a

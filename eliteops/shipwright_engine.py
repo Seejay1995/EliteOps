@@ -42,6 +42,74 @@ def _tokens(v: Any) -> set[str]:
             if w not in ("fsd", "the", "weapon", "drive", "tuning", "mount")}
 
 
+# --- slot-by-slot comparison ("your ship vs the build") --------------------
+_SIZE_WORD = {1: "Small", 2: "Medium", 3: "Large", 4: "Huge"}
+_CORE_LABEL = {"PowerPlant": "Power Plant", "MainEngines": "Thrusters", "FrameShiftDrive": "FSD",
+               "LifeSupport": "Life Support", "PowerDistributor": "Power Distributor",
+               "Radar": "Sensors", "FuelTank": "Fuel Tank"}
+# catalog group code of each core module -> its canonical (journal) core slot
+_CORE_GRP_SLOT = {"pp": "PowerPlant", "t": "MainEngines", "fsd": "FrameShiftDrive",
+                  "ls": "LifeSupport", "pd": "PowerDistributor", "s": "Radar", "ft": "FuelTank"}
+_GROUP_ORDER = ["core", "hardpoint", "utility", "optional"]
+_GROUP_LABEL = {"core": "Core Internals", "hardpoint": "Hardpoints",
+                "utility": "Utility Mounts", "optional": "Optional Internals"}
+
+
+def _group_of(category: str) -> str:
+    """Render group for a slot category (bulkheads live in the Core group)."""
+    return "core" if category in ("core", "bulkheads") else (category or "optional")
+
+
+def _ship_view(m: dict) -> dict:
+    return {"name": m.get("name"), "grp": m.get("grp"), "class": m.get("class"),
+            "rating": m.get("rating"), "size": m.get("size"), "engineering": m.get("engineering")}
+
+
+def _build_view(bm: dict) -> dict:
+    return {"type": bm.get("type"), "grp": bm.get("grp"), "class": bm.get("class"),
+            "rating": bm.get("rating"), "size": bm.get("class"), "blueprint": bm.get("blueprint"),
+            "grade": bm.get("grade"), "experimental": bm.get("experimental")}
+
+
+# journal blueprint symbols pack two words into one ("fsd_longrange", "heavyduty");
+# split them so they token-match the build's display names ("Increased Range",
+# "Heavy Duty"). Plus a few genuine synonyms (Boosted == Overcharged, etc.).
+_BP_COMPOUND = {"longrange": "long range", "lowemissions": "low emissions",
+                "heavyduty": "heavy duty", "highcapacity": "high capacity",
+                "lightweight": "light weight", "fastboot": "fast boot",
+                "highfrequency": "high frequency", "rapidfire": "rapid fire",
+                "doublebraced": "double braced", "blastresistant": "blast resistant",
+                "kineticresistant": "kinetic resistant", "thermalresistant": "thermal resistant",
+                "wideangle": "wide angle", "faststart": "fast start"}
+_BP_SYN = {"boosted": "overcharged", "tuned": "clean", "long": "increased"}
+_BP_STOP = {"fsd", "the", "weapon", "drive", "drives", "tuning", "mount", "sequence",
+            "engine", "armour", "powerplant", "power", "plant", "powerdistributor",
+            "distributor", "sensor", "sensors", "shieldgenerator", "shield", "generator",
+            "hullreinforcement", "hull", "reinforcement", "shieldbooster", "booster",
+            "hyperdrive", "lifesupport", "life", "support", "of", "v1", "misc"}
+
+
+def _bp_tokenset(name: Any) -> set[str]:
+    s = str(name or "").lower()
+    for compound, rep in _BP_COMPOUND.items():
+        s = s.replace(compound, rep)
+    words = "".join(ch if ch.isalnum() else " " for ch in s).split()
+    return {_BP_SYN.get(w, w) for w in words if w not in _BP_STOP and not w.isdigit()}
+
+
+def _blueprint_satisfied(eng: dict | None, want_bp: str, want_grade: Any) -> bool:
+    """True if a fitted module's engineering satisfies the build's target blueprint
+    (normalised token overlap) AND is rolled to at least the target grade."""
+    if not eng:
+        return False
+    if not (_bp_tokenset(want_bp) & _bp_tokenset(eng.get("blueprint"))):
+        return False
+    sg, wg = eng.get("grade"), want_grade
+    if wg and isinstance(sg, (int, float)) and sg < wg:
+        return False
+    return True
+
+
 class ShipwrightEngine:
     def __init__(self, state) -> None:
         self.state = state
@@ -96,6 +164,7 @@ class ShipwrightEngine:
             item = m.get("Item", "")
             grp = self.cat.grp_from_symbol(item)
             cat_mod = self.cat.module(grp) if grp else None
+            var = self.cat.variant_from_symbol(item)  # exact class/rating, or None
             size = _SIZE_RE.search(item)
             eng = m.get("Engineering")
             engineering = None
@@ -107,11 +176,15 @@ class ShipwrightEngine:
                     "experimental": eng.get("ExperimentalEffect"),
                     "engineer": eng.get("Engineer"),
                 }
+            derived_size = var["class"] if var else (int(size.group(1)) if size else None)
             modules.append({
                 "slot": m.get("Slot"), "item": item, "grp": grp,
                 "name": cat_mod["name"] if cat_mod else _prettify(item),
                 "category": cat_mod["category"] if cat_mod else None,
-                "size": int(size.group(1)) if size else None,
+                "size": derived_size,
+                "class": derived_size,               # class == size int, per catalog
+                "rating": var["rating"] if var else None,
+                "mass": var["mass"] if var else None,
                 "on": m.get("On", True), "value": m.get("Value"),
                 "engineering": engineering,
             })
@@ -232,6 +305,174 @@ class ShipwrightEngine:
                         "rating": m.get("rating"), "status": status,
                         "installed": is_installed, "engineered": engineered})
         return out
+
+    # --- slot-by-slot comparison (ship vs build) ---------------------------
+    def _slot_skeleton(self, ship: dict | None) -> list[dict]:
+        """Ordered canonical slot list for a hull, using journal slot-id
+        conventions so live modules key straight in. Empty list if hull unknown."""
+        if not ship:
+            return []
+        slots = ship.get("slots") or {}
+        out: list[dict] = [{"slot_id": "Armour", "category": "bulkheads", "group": "core",
+                            "label": "Bulkheads", "size": None, "restrict": None}]
+        for c in slots.get("core", []) or []:
+            jname = catalog.CORE_SLOT_TO_JOURNAL.get(c.get("slot"), c.get("slot"))
+            out.append({"slot_id": jname, "category": "core", "group": "core",
+                        "label": _CORE_LABEL.get(jname, _prettify(jname)),
+                        "size": c.get("size"), "restrict": None})
+        counters: dict[int, int] = {}
+        for sz in slots.get("hardpoints", []) or []:
+            counters[sz] = counters.get(sz, 0) + 1
+            word = _SIZE_WORD.get(sz, "Small")
+            out.append({"slot_id": f"{word}Hardpoint{counters[sz]}", "category": "hardpoint",
+                        "group": "hardpoint", "label": f"{word} hardpoint", "size": sz, "restrict": None})
+        for i in range(1, int(slots.get("utility") or 0) + 1):
+            out.append({"slot_id": f"TinyHardpoint{i}", "category": "utility", "group": "utility",
+                        "label": "Utility mount", "size": None, "restrict": None})
+        for i, o in enumerate(slots.get("optional", []) or [], start=1):
+            restrict = o.get("restrict")
+            out.append({"slot_id": f"Slot{i:02d}_Size{o.get('size')}", "category": "optional",
+                        "group": "optional", "label": (_prettify(restrict) if restrict else "Optional"),
+                        "size": o.get("size"), "restrict": restrict})
+        return out
+
+    def _flat_skeleton(self, loadout: dict | None, build: dict) -> list[dict]:
+        """Fallback skeleton for an unknown hull: enough rows per (category,size)
+        to hold the larger of the ship's and build's module counts."""
+        scount: dict[tuple, int] = {}
+        bcount: dict[tuple, int] = {}
+        for m in (loadout or {}).get("modules", []):
+            if m.get("category") in _VALID_CATEGORIES:
+                k = (m["category"], m.get("size")); scount[k] = scount.get(k, 0) + 1
+        for m in build.get("modules", []):
+            if m.get("category") in _VALID_CATEGORIES:
+                k = (m["category"], m.get("class")); bcount[k] = bcount.get(k, 0) + 1
+        keys = sorted(set(scount) | set(bcount),
+                      key=lambda k: (_GROUP_ORDER.index(_group_of(k[0])) if _group_of(k[0]) in _GROUP_ORDER else 9,
+                                     -(k[1] or 0)))
+        out, i = [], 0
+        for cat, size in keys:
+            for _ in range(max(scount.get((cat, size), 0), bcount.get((cat, size), 0))):
+                i += 1
+                out.append({"slot_id": f"flat{i}", "category": cat, "group": _group_of(cat),
+                            "label": cat.capitalize() + (f" Size {size}" if size else ""),
+                            "size": size, "restrict": None})
+        return out
+
+    @staticmethod
+    def _slot_status(row: dict) -> str:
+        ship, build = row.get("ship"), row.get("build")
+        if not ship and not build:
+            return "empty"
+        if build and not ship:
+            return "needs-buy"
+        if ship and not build:
+            return "extra"
+        sg, bg = ship.get("grp"), build.get("grp")
+        if sg and bg and sg != bg:
+            return "swap"
+        bp = build.get("blueprint")
+        if not bp:
+            return "match"
+        return "match" if _blueprint_satisfied(ship.get("engineering"), bp, build.get("grade")) else "needs-engineering"
+
+    def _compare(self) -> dict | None:
+        build = self._build
+        if not build:
+            return None
+        loadout = self._loadout
+        ship_key = (loadout or {}).get("ship_key")
+        build_hull = build.get("ship")
+        hull_mismatch = bool(loadout and build_hull and build_hull != ship_key)
+        skel_key = build_hull or ship_key
+        ship_rec = self.cat.ship(skel_key) if skel_key else None
+        skel = self._slot_skeleton(ship_rec) or self._flat_skeleton(loadout, build)
+        rows = [dict(s, ship=None, build=None) for s in skel]
+        by_id = {r["slot_id"]: r for r in rows}
+        by_cat: dict[str, list] = {}
+        for r in rows:
+            by_cat.setdefault(r["category"], []).append(r)
+
+        def bucket(cat: str, size: Any, side: str):
+            for r in by_cat.get(cat, []):
+                if r[side] is None and not r.get("restrict") and (r["size"] is None or r["size"] == size):
+                    return r
+            return None
+
+        # --- place current-ship modules ---
+        for m in (loadout or {}).get("modules", []):
+            cat = m.get("category")
+            if cat not in _VALID_CATEGORIES:
+                continue  # cockpit / cargo hatch / fuel reserve / paint etc.
+            row = None
+            if cat == "bulkheads":
+                row = by_id.get("Armour")
+            elif cat == "core":
+                row = by_id.get(_CORE_GRP_SLOT.get(m.get("grp"))) or by_id.get(m.get("slot"))
+            elif cat == "optional":
+                row = by_id.get(m.get("slot"))
+            if not (row and row["ship"] is None):
+                row = bucket(cat, m.get("size"), "ship")
+            if row and row["ship"] is None:
+                row["ship"] = _ship_view(m)
+            else:
+                rows.append({"slot_id": f"x-{len(rows)}", "category": cat, "group": _group_of(cat),
+                             "label": m.get("name") or cat, "size": m.get("size"), "restrict": None,
+                             "ship": _ship_view(m), "build": None})
+
+        # --- place build modules: core/bulkheads by grp-slot, then honor slot,
+        #     then grp-first pairing, then size fill ---
+        unplaced = []
+        for bm in build.get("modules", []):
+            cat = bm.get("category")
+            row = None
+            if cat == "bulkheads":
+                row = by_id.get("Armour")
+            elif cat == "core":
+                row = by_id.get(_CORE_GRP_SLOT.get(bm.get("grp"))) or (by_id.get(bm.get("slot")) if bm.get("slot") else None)
+            elif bm.get("slot") in by_id:
+                row = by_id.get(bm.get("slot"))
+            if row and row["build"] is None:
+                row["build"] = _build_view(bm)
+            else:
+                unplaced.append(bm)
+        for bm in list(unplaced):  # grp-first: pair with a slot whose ship shares grp
+            for r in by_cat.get(bm.get("category"), []):
+                if (r["build"] is None and not r.get("restrict") and (r["size"] is None or r["size"] == bm.get("class"))
+                        and r["ship"] and r["ship"].get("grp") == bm.get("grp")):
+                    r["build"] = _build_view(bm); unplaced.remove(bm); break
+        for bm in list(unplaced):  # fill any empty same-(category,size) slot
+            r = bucket(bm.get("category"), bm.get("class"), "build")
+            if r:
+                r["build"] = _build_view(bm)
+            else:
+                rows.append({"slot_id": f"b-{len(rows)}", "category": bm.get("category"),
+                             "group": _group_of(bm.get("category")), "label": bm.get("type") or "Module",
+                             "size": bm.get("class"), "restrict": None, "ship": None, "build": _build_view(bm)})
+
+        # --- statuses + grouping + rollup ---
+        rollup = {"match": 0, "needs_engineering": 0, "swap": 0, "needs_buy": 0, "extra": 0, "total": 0}
+        grouped: dict[str, list] = {}
+        for r in rows:
+            st = self._slot_status(r)
+            if st == "empty":
+                continue
+            r["status"] = st
+            rollup[st.replace("-", "_")] = rollup.get(st.replace("-", "_"), 0) + 1
+            rollup["total"] += 1
+            grouped.setdefault(r["group"], []).append(r)
+        groups = []
+        for g in _GROUP_ORDER:
+            grows = grouped.get(g)
+            if not grows:
+                continue
+            groups.append({"category": g, "label": _GROUP_LABEL.get(g, g.capitalize()),
+                           "slots": [{"slot_id": r["slot_id"], "label": r["label"], "size": r["size"],
+                                      "status": r["status"], "ship": r["ship"], "build": r["build"]}
+                                     for r in grows]})
+        return {"hull": skel_key, "hull_name": (ship_rec or {}).get("name") or build_hull,
+                "hull_mismatch": hull_mismatch, "ship_present": bool(loadout),
+                "groups": groups, "rollup": rollup}
 
     # --- engineering material plan (port of EngineeringMaterialPlanner) ----
     def _material_owned(self, fd: str) -> int:
@@ -489,6 +730,7 @@ class ShipwrightEngine:
                 "engineers": engineers,
                 "build": self._build,
                 "reconciliation": self._reconcile(),
+                "comparison": self._compare(),
                 "material_plan": self._plan_materials(),
                 "engineer_plan": self._engineer_plan(),
                 "acquisition": self._acq,
