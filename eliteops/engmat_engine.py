@@ -193,38 +193,75 @@ class EngMatEngine:
                         bucket[it["Name"].lower()] = int(it.get("Count", 0))
                 self._materials[cat.lower()] = bucket
 
-    # --- trader finder (Spansh, on demand) ---------------------------------
+    # --- trader finder (Inara primary, Spansh fallback) --------------------
     def find_traders(self) -> None:
         with self._lock:
             self._traders = {"status": "searching", "results": {}, "error": ""}
         threading.Thread(target=self._run_traders, name="eliteops-traders", daemon=True).start()
 
     def _run_traders(self) -> None:
-        # Inara is the source here, NOT Spansh: Spansh's per-station `services`
-        # list is empty for most stations, so its "Material Trader" filter just
-        # returns economy-matched stations that usually have no trader. Inara
-        # crowd-sources the real service list AND the trader type (Raw/Mfd/Enc).
+        # PRIMARY: Inara — it's the only source with real per-station service data
+        # AND the trader type (Raw/Mfd/Enc). If Inara blocks us (its bot-check) or
+        # errors, fall back to Spansh economy-matching (presence not guaranteed) and
+        # always hand the user a browser deep-link to Inara's exact list.
+        from . import inara_client
+        ref = self.state.snapshot().get("system")
+        if not ref:
+            with self._lock:
+                self._traders = {"status": "error", "results": {},
+                                 "error": "No reference system — jump in-game first."}
+            return
+        svc = {"raw": "material_raw", "manufactured": "material_manufactured", "encoded": "material_encoded"}
+        inara_urls = {k: inara_client.nearest_url(ref, s) for k, s in svc.items()}
         try:
-            from . import inara_client
-            ref = self.state.snapshot().get("system")
-            if not ref:
-                raise ValueError("No reference system — jump in-game first.")
-            svc = {"raw": "material_raw", "manufactured": "material_manufactured",
-                   "encoded": "material_encoded"}
             groups: dict[str, list] = {"raw": [], "manufactured": [], "encoded": []}
             for kind, service in svc.items():
                 for s in inara_client.nearest_stations(ref, service, limit=3):
                     groups[kind].append({
                         "system": s.get("system"), "station": s.get("station"),
                         "distance_ly": s.get("distance_ly"), "distance_ls": s.get("station_dist_ls"),
-                        "economy": s.get("economy"), "allegiance": s.get("allegiance"),
-                    })
+                        "economy": s.get("economy"), "allegiance": s.get("allegiance")})
             with self._lock:
                 self._traders = {"status": "ready", "results": groups, "error": "",
-                                 "reference": ref, "source": "inara"}
+                                 "reference": ref, "source": "inara", "inara_urls": inara_urls}
+            return
+        except inara_client.InaraBlocked:
+            note = ("Inara is blocking automated lookups from your connection right now (its "
+                    "bot-check — often a VPN/proxy triggers it). Showing economy-matched "
+                    "candidates from Spansh, which may not all actually have a trader. Use the "
+                    "“Open in Inara” links for the confirmed list in your browser.")
+        except Exception as exc:  # noqa: BLE001
+            note = f"Inara lookup unavailable ({exc}). Showing economy-matched candidates from Spansh."
+        try:
+            groups = self._spansh_traders(ref)
+            with self._lock:
+                self._traders = {"status": "ready", "results": groups, "error": "", "reference": ref,
+                                 "source": "spansh-fallback", "note": note, "inara_urls": inara_urls}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
-                self._traders = {"status": "error", "results": {}, "error": str(exc)}
+                self._traders = {"status": "error", "results": {}, "error": str(exc),
+                                 "note": note, "inara_urls": inara_urls}
+
+    def _spansh_traders(self, ref: str) -> dict[str, list]:
+        """Fallback: nearest dockable stations grouped by the economy that decides
+        material-trader type. A trader's PRESENCE is not guaranteed — verify/Inara."""
+        body = {"filters": {"distance": {"min": "0", "max": "120"},
+                            "type": {"value": spansh_client._ACQUIRE_STATION_TYPES}},
+                "sort": [{"distance": {"direction": "asc"}}],
+                "reference_system": ref, "size": 60}
+        data = spansh_client._jpost("/stations/search", body, timeout=30)
+        groups: dict[str, list] = {"raw": [], "manufactured": [], "encoded": []}
+        for s in (data.get("results") if isinstance(data, dict) else []) or []:
+            if "Carrier" in str(s.get("type") or ""):
+                continue
+            kind = _mat_trader_type(s.get("primary_economy"), s.get("secondary_economy"))
+            if kind not in groups or len(groups[kind]) >= 3:
+                continue
+            groups[kind].append({
+                "system": s.get("system_name"), "station": s.get("name"),
+                "distance_ly": s.get("distance"), "distance_ls": s.get("distance_to_arrival"),
+                "economy": s.get("primary_economy") or s.get("economy") or "", "large_pad": s.get("has_large_pad")})
+        return groups
 
     # --- snapshot -----------------------------------------------------------
     def snapshot(self) -> dict:

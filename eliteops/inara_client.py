@@ -44,6 +44,29 @@ _CACHE: dict[tuple, tuple[float, list]] = {}
 _CACHE_TTL = 300.0  # 5 min — trader locations don't churn fast
 _LOCK = threading.Lock()
 
+# Inara shows an interstitial "are you a bot?" wall (HTTP 503) to IP ranges it
+# doesn't trust (often VPN/proxy). We can't — and shouldn't — bypass it; detect
+# it so callers can fail fast and fall back / point the user at their browser.
+_BLOCK_MARKERS = ("access check required", "not a bot", "confirm your visit",
+                  "something happened")
+
+
+class InaraBlocked(RuntimeError):
+    """Inara served its bot-check wall instead of results."""
+
+
+def _is_block(text: str) -> bool:
+    low = (text or "").lower()
+    return any(mrk in low for mrk in _BLOCK_MARKERS)
+
+
+def nearest_url(reference_system: str, service: str) -> str:
+    """The public Inara 'nearest stations' URL for this query — for the USER to
+    open in their own browser (where the bot-check lets a human through)."""
+    code = SERVICE.get(service, "")
+    qs = urllib.parse.urlencode([("formbrief", "1"), ("ps1", reference_system or ""), ("pa1[]", code)])
+    return _BASE + "?" + qs
+
 
 def _strip(html: str) -> str:
     txt = re.sub(r"<[^>]+>", " ", unescape(html)).replace("\xa0", " ")
@@ -118,29 +141,38 @@ def nearest_stations(reference_system: str, service: str, *, limit: int = 20,
     req = urllib.request.Request(_BASE + "?" + qs, headers={"User-Agent": _UA})
 
     last_err: Exception | None = None
-    for attempt in range(3):
+    for attempt in range(2):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 html = resp.read().decode("utf-8", "replace")
-            rows = _parse(html)
-            with _LOCK:
-                _CACHE[key] = (time.time(), rows)
-            return rows[:limit]
         except urllib.error.HTTPError as exc:
+            body = ""
+            try:
+                body = exc.read().decode("utf-8", "replace")
+            except Exception:  # noqa: BLE001
+                pass
+            if _is_block(body):
+                raise InaraBlocked("Inara is showing its bot-check wall") from exc
             last_err = exc
-            if exc.code in (429, 500, 502, 503, 504) and attempt < 2:
-                time.sleep(1.5 * (attempt + 1))  # brief backoff; Inara throttles bursts
+            if exc.code in (429, 500, 502, 504) and attempt < 1:
+                time.sleep(1.5)
                 continue
             break
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             last_err = exc
-            if attempt < 2:
+            if attempt < 1:
                 time.sleep(1.0)
                 continue
             break
+        else:
+            if _is_block(html):
+                raise InaraBlocked("Inara is showing its bot-check wall")
+            rows = _parse(html)
+            with _LOCK:
+                _CACHE[key] = (time.time(), rows)
+            return rows[:limit]
 
-    # transient failure — serve a (possibly stale) cache entry if we have one
-    with _LOCK:
+    with _LOCK:  # transient failure — serve a (possibly stale) cache entry if we have one
         stale = _CACHE.get(key)
     if stale:
         return stale[1][:limit]

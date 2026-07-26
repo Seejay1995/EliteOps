@@ -1628,10 +1628,12 @@ function renderBroker(b){
   if(!b) return;
   const st=$('gBrokerStatus');
   if(b.status==='searching'){ st.textContent='◷ searching Inara…'; return; }
-  if(b.status==='error'){ st.textContent='⚠ '+b.error; $('gBrokerStops').innerHTML=''; return; }
+  const noteHtml = b.note?`<div class="banner" style="margin-bottom:.6rem;font-size:.8rem">${esc(b.note)}${inaraLink(b.inara_url)}</div>`:'';
+  if(b.status==='error'){ st.textContent='⚠ '+b.error;
+    $('gBrokerStops').innerHTML = noteHtml || (b.inara_url?`<div class="muted" style="font-size:.82rem">Try the exact list in your browser:${inaraLink(b.inara_url)}</div>`:''); return; }
   if(b.status==='ready'){
-    st.textContent = `from ${b.reference||'?'} · ${b.stops.length} broker(s)`;
-    $('gBrokerStops').innerHTML = '<div class="stops">'+b.stops.map((s,i)=>
+    st.textContent = (b.source==='spansh-fallback'?'⚠ Inara blocked — Spansh candidates':`from ${b.reference||'?'} · ${b.stops.length} broker(s)`);
+    $('gBrokerStops').innerHTML = noteHtml + '<div class="stops">'+b.stops.map((s,i)=>
       `<div class="stop"><div class="stop-h"><span class="num">${i+1}</span>`+
       `<span class="place">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
       `<span class="muted" style="font-size:.75rem">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''}${s.large_pad?' · L pad':''}</span>`+
@@ -1968,22 +1970,32 @@ $('emTradersBtn').addEventListener('click', async()=>{
   try{ await fetch('/api/engmat/traders',{method:'POST'}); }catch(e){}
   for(let i=0;i<25;i++){ await new Promise(r=>setTimeout(r,1000)); const d=await jget('/api/engmat'); renderTraders(d.traders); if((d.traders||{}).status!=='searching') break; }
 });
-function traderGroup(title,rows,col){
-  if(!rows||!rows.length) return `<div class="matchip" style="opacity:.6">${title}: none in range</div>`;
-  return `<div style="margin-bottom:.5rem"><div class="sw-eyebrow" style="color:${col}">${title}</div>`+
+function inaraLink(url,label){ return url?` <a href="${esc(url)}" target="_blank" rel="noopener" style="font-size:.72rem;color:var(--cyan)">${label||'Open in Inara ↗'}</a>`:''; }
+function traderGroup(title,rows,col,url){
+  const head=`<div class="sw-eyebrow" style="color:${col}">${title}${inaraLink(url)}</div>`;
+  if(!rows||!rows.length) return `<div style="margin-bottom:.5rem">${head}<div class="matchip" style="opacity:.6">none found — use the Inara link</div></div>`;
+  return `<div style="margin-bottom:.5rem">${head}`+
     rows.map(s=>`<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.station)} <small>/ ${esc(s.system)} · ${esc(s.economy||'')}</small></span>`+
     `<span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''}${s.large_pad?' · L':''}</span>`+
     `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉</button></div>`).join('')+'</div>';
 }
 function renderTraders(t){
   if(!t) return;
-  const st=$('emTradersStatus');
+  const st=$('emTradersStatus'), urls=t.inara_urls||{};
   if(t.status==='searching'){ st.textContent='◷ searching Inara…'; return; }
-  if(t.status==='error'){ st.textContent='⚠ '+t.error; return; }
+  const noteHtml = t.note?`<div class="banner" style="margin-bottom:.6rem;font-size:.8rem">${esc(t.note)}</div>`:'';
+  if(t.status==='error'){
+    st.textContent='⚠ '+t.error;
+    $('emTraders').innerHTML = noteHtml + (urls.raw?`<div class="muted" style="font-size:.82rem">Exact list in your browser:${inaraLink(urls.raw,'Raw ↗')} ·${inaraLink(urls.manufactured,'Manufactured ↗')} ·${inaraLink(urls.encoded,'Encoded ↗')}</div>`:'');
+    return;
+  }
   if(t.status==='ready'){
-    st.textContent='from '+(t.reference||'?');
+    st.textContent = t.source==='spansh-fallback' ? '⚠ Inara blocked — Spansh candidates' : 'from '+(t.reference||'?');
     const r=t.results||{};
-    $('emTraders').innerHTML = traderGroup('Raw trader',r.raw,EM_COL.orange)+traderGroup('Manufactured trader',r.manufactured,EM_COL.gold)+traderGroup('Encoded trader',r.encoded,EM_COL.cyan);
+    $('emTraders').innerHTML = noteHtml +
+      traderGroup('Raw trader',r.raw,EM_COL.orange,urls.raw)+
+      traderGroup('Manufactured trader',r.manufactured,EM_COL.gold,urls.manufactured)+
+      traderGroup('Encoded trader',r.encoded,EM_COL.cyan,urls.encoded);
   }
 }
 let _emLookupT=null;

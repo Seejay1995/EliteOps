@@ -144,26 +144,68 @@ class GuardianEngine:
         threading.Thread(target=self._run_broker, name="eliteops-guardian-broker", daemon=True).start()
 
     def _run_broker(self) -> None:
-        # Inara is the source, NOT Spansh. Spansh's per-station `services` list is
-        # empty for most stations, so filtering on "Technology Broker" there dropped
-        # every result. Inara crowd-sources the real service list and even tags the
-        # broker type, so we ask it directly for the nearest GUARDIAN tech brokers.
+        # PRIMARY: Inara (real service data + Guardian/Human broker type). On its
+        # bot-check block or any error, fall back to Spansh High-Tech-economy
+        # candidates (a Guardian broker sits at High Tech) and hand the user a
+        # browser deep-link to Inara's confirmed list.
+        from . import inara_client
+        ref = self.state.snapshot().get("system")
+        if not ref:
+            with self._lock:
+                self._broker = {"status": "error", "stops": [],
+                                "error": "No reference system — jump in-game first."}
+            return
+        inara_url = inara_client.nearest_url(ref, "broker_guardian")
         try:
-            from . import inara_client
-            ref = self.state.snapshot().get("system")
-            if not ref:
-                raise ValueError("No reference system — jump in-game first.")
-            stops = []
-            for s in inara_client.nearest_stations(ref, "broker_guardian", limit=8):
-                stops.append({"system": s.get("system"), "station": s.get("station"),
-                              "distance_ly": s.get("distance_ly"), "distance_ls": s.get("station_dist_ls"),
-                              "economy": s.get("economy"), "allegiance": s.get("allegiance")})
+            stops = [{"system": s.get("system"), "station": s.get("station"),
+                      "distance_ly": s.get("distance_ly"), "distance_ls": s.get("station_dist_ls"),
+                      "economy": s.get("economy"), "allegiance": s.get("allegiance")}
+                     for s in inara_client.nearest_stations(ref, "broker_guardian", limit=8)]
             with self._lock:
                 self._broker = {"status": "ready", "stops": stops, "error": "",
-                                "reference": ref, "source": "inara"}
+                                "reference": ref, "source": "inara", "inara_url": inara_url}
+            return
+        except inara_client.InaraBlocked:
+            note = ("Inara is blocking automated lookups right now (its bot-check). Showing "
+                    "High-Tech stations from Spansh as candidates — a Guardian broker isn't "
+                    "guaranteed at each. Use “Open in Inara” for the confirmed list.")
+        except Exception as exc:  # noqa: BLE001
+            note = f"Inara lookup unavailable ({exc}). Showing High-Tech candidates from Spansh."
+        try:
+            stops = self._spansh_broker(ref)
+            with self._lock:
+                self._broker = {"status": "ready", "stops": stops, "error": "", "reference": ref,
+                                "source": "spansh-fallback", "note": note, "inara_url": inara_url}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
-                self._broker = {"status": "error", "stops": [], "error": str(exc)}
+                self._broker = {"status": "error", "stops": [], "error": str(exc),
+                                "note": note, "inara_url": inara_url}
+
+    def _spansh_broker(self, ref: str) -> list[dict]:
+        """Fallback: nearest High-Tech stations (Guardian brokers live at High Tech).
+        Presence not guaranteed — verify or use the Inara link."""
+        seen, stops = set(), []
+        for econ_key in ("primary_economy", "secondary_economy"):
+            body = {"filters": {"distance": {"min": "0", "max": "500"},
+                                "type": {"value": spansh_client._ACQUIRE_STATION_TYPES},
+                                econ_key: {"value": ["High Tech"]}},
+                    "sort": [{"distance": {"direction": "asc"}}],
+                    "reference_system": ref, "size": 30}
+            data = spansh_client._jpost("/stations/search", body, timeout=30)
+            for s in (data.get("results") if isinstance(data, dict) else []) or []:
+                name = str(s.get("name") or "")
+                if "Carrier" in str(s.get("type") or "") or name.startswith("$"):
+                    continue
+                k = (s.get("system_name"), name)
+                if k in seen:
+                    continue
+                seen.add(k)
+                stops.append({"system": s.get("system_name"), "station": name,
+                              "distance_ly": s.get("distance"), "distance_ls": s.get("distance_to_arrival"),
+                              "economy": s.get("primary_economy") or s.get("economy") or "",
+                              "large_pad": s.get("has_large_pad")})
+        stops.sort(key=lambda x: x["distance_ly"] if x["distance_ly"] is not None else 1e9)
+        return stops[:8]
 
     # --- commodity market finder (for 'Buy' ingredients) -------------------
     def find_market(self, commodity: str) -> None:
