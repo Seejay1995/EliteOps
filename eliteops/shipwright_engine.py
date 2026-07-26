@@ -162,9 +162,11 @@ class ShipwrightEngine:
         modules = []
         for m in e.get("Modules", []) or []:
             item = m.get("Item", "")
-            grp = self.cat.grp_from_symbol(item)
+            var = self.cat.variant_from_symbol(item)  # exact class/rating/grp, or None
+            # prefer the exact-symbol group (grp_from_symbol's root match can mis-id
+            # suffix variants, e.g. a bi-weave "..._fast" reads as a plain shield)
+            grp = (var.get("grp") if var else None) or self.cat.grp_from_symbol(item)
             cat_mod = self.cat.module(grp) if grp else None
-            var = self.cat.variant_from_symbol(item)  # exact class/rating, or None
             size = _SIZE_RE.search(item)
             eng = m.get("Engineering")
             engineering = None
@@ -420,8 +422,12 @@ class ShipwrightEngine:
                              "label": m.get("name") or cat, "size": m.get("size"), "restrict": None,
                              "ship": _ship_view(m), "build": None})
 
-        # --- place build modules: core/bulkheads by grp-slot, then honor slot,
-        #     then grp-first pairing, then size fill ---
+        # --- place build modules. Match to what's ACTUALLY on the ship first, so
+        #     a fitted fuel scoop lines up with the build's fuel scoop wherever it
+        #     physically sits. Order: core by function slot -> pair with a fitted
+        #     module of the same group -> fill an empty slot -> overflow. Honoring
+        #     the build's authored slot is deliberately LAST (a preset's authored
+        #     slot must not override where the module really is on your ship). ---
         unplaced = []
         for bm in build.get("modules", []):
             cat = bm.get("category")
@@ -430,20 +436,30 @@ class ShipwrightEngine:
                 row = by_id.get("Armour")
             elif cat == "core":
                 row = by_id.get(_CORE_GRP_SLOT.get(bm.get("grp"))) or (by_id.get(bm.get("slot")) if bm.get("slot") else None)
-            elif bm.get("slot") in by_id:
-                row = by_id.get(bm.get("slot"))
             if row and row["build"] is None:
                 row["build"] = _build_view(bm)
             else:
                 unplaced.append(bm)
-        for bm in list(unplaced):  # grp-first: pair with a slot whose ship shares grp
-            for r in by_cat.get(bm.get("category"), []):
-                if (r["build"] is None and not r.get("restrict") and (r["size"] is None or r["size"] == bm.get("class"))
-                        and r["ship"] and r["ship"].get("grp") == bm.get("grp")):
-                    r["build"] = _build_view(bm); unplaced.remove(bm); break
-        for bm in list(unplaced):  # fill any empty same-(category,size) slot
-            r = bucket(bm.get("category"), bm.get("class"), "build")
+
+        def _pair_to_ship(bm):  # a fitted module of the same group (prefer same size)
+            cand = [r for r in by_cat.get(bm.get("category"), [])
+                    if r["build"] is None and not r.get("restrict")
+                    and r["ship"] and r["ship"].get("grp") and r["ship"].get("grp") == bm.get("grp")]
+            return next((r for r in cand if r["size"] == bm.get("class")), None) or (cand[0] if cand else None)
+
+        for bm in list(unplaced):        # 1) it's on the ship -> same row
+            r = _pair_to_ship(bm)
             if r:
+                r["build"] = _build_view(bm); unplaced.remove(bm)
+        for bm in list(unplaced):        # 2) not fitted -> empty slot of the right size
+            cand = [r for r in by_cat.get(bm.get("category"), [])
+                    if r["build"] is None and not r.get("restrict") and (r["size"] is None or r["size"] == bm.get("class"))]
+            r = next((x for x in cand if x["ship"] is None), None) or (cand[0] if cand else None)
+            if r:
+                r["build"] = _build_view(bm); unplaced.remove(bm)
+        for bm in list(unplaced):        # 3) authored slot as a last resort, else overflow
+            r = by_id.get(bm.get("slot")) if bm.get("slot") in by_id else None
+            if r and r["build"] is None:
                 r["build"] = _build_view(bm)
             else:
                 rows.append({"slot_id": f"b-{len(rows)}", "category": bm.get("category"),
