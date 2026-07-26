@@ -167,15 +167,32 @@ class GuardianEngine:
             return
         except inara_client.InaraBlocked:
             note = ("Inara is blocking automated lookups right now (its bot-check). Showing "
-                    "High-Tech stations from Spansh as candidates — a Guardian broker isn't "
-                    "guaranteed at each. Use “Open in Inara” for the confirmed list.")
+                    "EDSM's confirmed Guardian tech brokers instead. Use “Open in Inara” for "
+                    "the full list.")
         except Exception as exc:  # noqa: BLE001
-            note = f"Inara lookup unavailable ({exc}). Showing High-Tech candidates from Spansh."
+            note = f"Inara lookup unavailable ({exc}). Showing EDSM's confirmed Guardian brokers."
+
+        # FALLBACK 1: EDSM — real per-station service data (Technology Broker + High Tech).
+        try:
+            from . import edsm_traders
+            stops = edsm_traders.nearest_guardian_brokers(ref)
+            if stops:
+                with self._lock:
+                    self._broker = {"status": "ready", "stops": stops, "error": "", "reference": ref,
+                                    "source": "edsm", "note": note, "inara_url": inara_url}
+                return
+        except Exception:  # noqa: BLE001 — EDSM down too; drop to economy guess
+            pass
+
+        # FALLBACK 2: Spansh High-Tech economy candidates (presence NOT guaranteed).
         try:
             stops = self._spansh_broker(ref)
             with self._lock:
                 self._broker = {"status": "ready", "stops": stops, "error": "", "reference": ref,
-                                "source": "spansh-fallback", "note": note, "inara_url": inara_url}
+                                "source": "spansh-fallback",
+                                "note": note + " (EDSM had nothing nearby — these are High-Tech "
+                                               "Spansh guesses; verify on arrival.)",
+                                "inara_url": inara_url}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
                 self._broker = {"status": "error", "stops": [], "error": str(exc),

@@ -26,12 +26,13 @@ _ECON_RULE = {"hightech": "encoded", "military": "encoded",
 
 
 def _mat_trader_type(primary: str, secondary: str) -> str | None:
-    kind = None
+    # Trader type follows the PRIMARY economy (verified vs Inara's classifications);
+    # fall back to secondary only when the primary has no trader mapping.
     for econ in (str(primary or ""), str(secondary or "")):
         e = econ.lower().replace(" ", "")
         if e in _ECON_RULE:
-            kind = _ECON_RULE[e]  # secondary (checked last) overrides primary, per the rule
-    return kind
+            return _ECON_RULE[e]
+    return None
 
 TRADER_INFO = (
     "Material Traders swap materials you have for ones you need. Within a category you can "
@@ -204,7 +205,7 @@ class EngMatEngine:
         # AND the trader type (Raw/Mfd/Enc). If Inara blocks us (its bot-check) or
         # errors, fall back to Spansh economy-matching (presence not guaranteed) and
         # always hand the user a browser deep-link to Inara's exact list.
-        from . import inara_client
+        from . import inara_client, edsm_traders
         ref = self.state.snapshot().get("system")
         if not ref:
             with self._lock:
@@ -227,16 +228,32 @@ class EngMatEngine:
             return
         except inara_client.InaraBlocked:
             note = ("Inara is blocking automated lookups from your connection right now (its "
-                    "bot-check — often a VPN/proxy triggers it). Showing economy-matched "
-                    "candidates from Spansh, which may not all actually have a trader. Use the "
-                    "“Open in Inara” links for the confirmed list in your browser.")
+                    "bot-check — often a VPN/proxy triggers it). Showing EDSM's confirmed "
+                    "material-trader stations instead. Use the “Open in Inara” links for the "
+                    "full list in your browser.")
         except Exception as exc:  # noqa: BLE001
-            note = f"Inara lookup unavailable ({exc}). Showing economy-matched candidates from Spansh."
+            note = f"Inara lookup unavailable ({exc}). Showing EDSM's confirmed trader stations."
+
+        # FALLBACK 1: EDSM — real per-station service data (verified traders, just slower).
+        try:
+            groups = edsm_traders.nearest_material_traders(ref)
+            if any(groups.values()):
+                with self._lock:
+                    self._traders = {"status": "ready", "results": groups, "error": "", "reference": ref,
+                                     "source": "edsm", "note": note, "inara_urls": inara_urls}
+                return
+        except Exception:  # noqa: BLE001 — EDSM down too; drop to economy guess
+            pass
+
+        # FALLBACK 2: Spansh economy-matching (presence NOT guaranteed — last resort).
         try:
             groups = self._spansh_traders(ref)
             with self._lock:
                 self._traders = {"status": "ready", "results": groups, "error": "", "reference": ref,
-                                 "source": "spansh-fallback", "note": note, "inara_urls": inara_urls}
+                                 "source": "spansh-fallback",
+                                 "note": note + " (EDSM had nothing nearby — these are economy-matched "
+                                                "Spansh guesses; verify on arrival.)",
+                                 "inara_urls": inara_urls}
         except Exception as exc:  # noqa: BLE001
             with self._lock:
                 self._traders = {"status": "error", "results": {}, "error": str(exc),
