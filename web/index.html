@@ -1632,7 +1632,9 @@ function renderBroker(b){
   if(b.status==='error'){ st.textContent='⚠ '+b.error;
     $('gBrokerStops').innerHTML = noteHtml || (b.inara_url?`<div class="muted" style="font-size:.82rem">Try the exact list in your browser:${inaraLink(b.inara_url)}</div>`:''); return; }
   if(b.status==='ready'){
-    st.textContent = (b.source==='spansh-fallback'?'⚠ Inara blocked — Spansh candidates':`from ${b.reference||'?'} · ${b.stops.length} broker(s)`);
+    st.textContent = b.source==='spansh-fallback' ? '⚠ Inara blocked — Spansh guesses'
+                   : b.source==='edsm' ? `via EDSM (Inara blocked) · ${b.stops.length} broker(s)`
+                   : `from ${b.reference||'?'} · ${b.stops.length} broker(s)`;
     $('gBrokerStops').innerHTML = noteHtml + '<div class="stops">'+b.stops.map((s,i)=>
       `<div class="stop"><div class="stop-h"><span class="num">${i+1}</span>`+
       `<span class="place">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
@@ -1990,7 +1992,9 @@ function renderTraders(t){
     return;
   }
   if(t.status==='ready'){
-    st.textContent = t.source==='spansh-fallback' ? '⚠ Inara blocked — Spansh candidates' : 'from '+(t.reference||'?');
+    st.textContent = t.source==='spansh-fallback' ? '⚠ Inara blocked — Spansh guesses'
+                   : t.source==='edsm' ? 'via EDSM (Inara blocked) — from '+(t.reference||'?')
+                   : 'from '+(t.reference||'?');
     const r=t.results||{};
     $('emTraders').innerHTML = noteHtml +
       traderGroup('Raw trader',r.raw,EM_COL.orange,urls.raw)+
