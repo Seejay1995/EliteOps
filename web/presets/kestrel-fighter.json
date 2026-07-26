@@ -1,0 +1,39 @@
+{
+  "schema": "eliteops.shipbuild/1",
+  "name": "Kestrel Mk II — Glass Cannon",
+  "ship": "kestrel",
+  "role": "Combat / Bounty Hunting",
+  "notes": "A light (190t), fast (271/360, ~530 boosted) hot-rod fighter with 3 Large + 2 Small hardpoints — huge firepower for a small hull. Loadout is all GIMBALLED for easy tracking: 3 Large Multi-Cannons melt hull (one Corrosive Shell to strip armour for the other two), 2 Small Beam Lasers strip shields and vent heat. Bi-Weave shields for fast regen, twin cell banks + hull reinforcement to survive the knife-fight, Chaff to spoil NPC gimbals. Fly it like it's on fire — boost, orbit, delete. Small pad; Core Dynamics (may need a Federal rank / early-access unlock — verify at the shipyard).",
+  "search": { "referenceSystem": "", "useCurrentSystem": true, "radiusLy": 60, "requireLargePad": false, "includeFleetCarriers": false },
+  "rollProfile": { "1": 1, "2": 2, "3": 4, "4": 6, "5": 10 },
+  "modules": [
+    { "slot": "PowerPlant",       "category": "core", "type": "Power Plant",       "class": 5, "rating": "A", "blueprint": "Overcharged",    "grade": 5, "experimental": "Thermal Spread", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "MainEngines",      "category": "core", "type": "Thrusters",         "class": 5, "rating": "A", "blueprint": "Dirty",          "grade": 5, "experimental": "Drag Drives",    "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "FrameShiftDrive",  "category": "core", "type": "Frame Shift Drive", "class": 4, "rating": "A", "blueprint": "Increased Range","grade": 5, "experimental": "Mass Manager",   "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "LifeSupport",      "category": "core", "type": "Life Support",      "class": 1, "rating": "D", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "PowerDistributor", "category": "core", "type": "Power Distributor", "class": 5, "rating": "A", "blueprint": "Charge Enhanced","grade": 5, "experimental": "Super Conduits", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Radar",           "category": "core", "type": "Sensors",           "class": 2, "rating": "D", "blueprint": "Lightweight",    "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "FuelTank",        "category": "core", "type": "Fuel Tank",         "class": 4, "rating": "C", "quantity": 1, "acquisition": "StandardOutfitting" },
+
+    { "slot": "LargeHardpoint1", "category": "hardpoint", "type": "Multi Cannon", "class": 3, "rating": "C", "blueprint": "Overcharged", "grade": 5, "experimental": "Corrosive Shell", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "LargeHardpoint2", "category": "hardpoint", "type": "Multi Cannon", "class": 3, "rating": "C", "blueprint": "Overcharged", "grade": 5, "experimental": "Auto Loader", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "LargeHardpoint3", "category": "hardpoint", "type": "Multi Cannon", "class": 3, "rating": "C", "blueprint": "Overcharged", "grade": 5, "experimental": "Auto Loader", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "SmallHardpoint1", "category": "hardpoint", "type": "Beam Laser", "class": 1, "rating": "E", "blueprint": "Efficient", "grade": 5, "experimental": "Thermal Vent", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "SmallHardpoint2", "category": "hardpoint", "type": "Beam Laser", "class": 1, "rating": "E", "blueprint": "Efficient", "grade": 5, "experimental": "Thermal Vent", "quantity": 1, "acquisition": "StandardOutfitting" },
+
+    { "slot": "Utility1", "category": "utility", "type": "Shield Booster",     "class": 0, "rating": "A", "blueprint": "Heavy Duty", "grade": 5, "experimental": "Super Capacitors", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility2", "category": "utility", "type": "Shield Booster",     "class": 0, "rating": "A", "blueprint": "Heavy Duty", "grade": 5, "experimental": "Super Capacitors", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility3", "category": "utility", "type": "Chaff Launcher",     "class": 0, "rating": "I", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Utility4", "category": "utility", "type": "Heat Sink Launcher", "class": 0, "rating": "I", "quantity": 1, "acquisition": "StandardOutfitting" },
+
+    { "slot": "Slot01_Size5", "category": "optional", "type": "Bi Weave Shield Generator",  "class": 5, "rating": "C", "blueprint": "Reinforced", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot02_Size4", "category": "optional", "type": "Shield Cell Bank",           "class": 4, "rating": "A", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot03_Size4", "category": "optional", "type": "Hull Reinforcement Package", "class": 4, "rating": "D", "blueprint": "Heavy Duty", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot04_Size3", "category": "optional", "type": "Hull Reinforcement Package", "class": 3, "rating": "D", "blueprint": "Heavy Duty", "grade": 5, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot05_Size2", "category": "optional", "type": "Module Reinforcement Package","class": 2, "rating": "D", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot06_Size2", "category": "optional", "type": "Hull Reinforcement Package", "class": 2, "rating": "D", "blueprint": "Heavy Duty", "grade": 3, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot07_Size2", "category": "optional", "type": "Shield Cell Bank",           "class": 2, "rating": "A", "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot08_Size1", "category": "optional", "type": "Hull Reinforcement Package", "class": 1, "rating": "D", "blueprint": "Heavy Duty", "grade": 3, "quantity": 1, "acquisition": "StandardOutfitting" },
+    { "slot": "Slot09_Size1", "category": "optional", "type": "Hull Reinforcement Package", "class": 1, "rating": "D", "blueprint": "Heavy Duty", "grade": 3, "quantity": 1, "acquisition": "StandardOutfitting" }
+  ]
+}
