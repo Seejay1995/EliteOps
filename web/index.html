@@ -269,6 +269,11 @@
   .sw-subtab:hover{color:var(--text)}
   .sw-subtab.active{color:#1a1103;background:var(--orange);border-color:var(--orange)}
   .sw-buildchip{color:var(--gold);font-size:.85rem;font-weight:600}
+  .sw-headline{display:flex;flex-direction:column;gap:.1rem;min-width:0}
+  .sw-active{color:var(--gold);font-size:1.15rem;font-weight:700;line-height:1.15;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:22rem}
+  #swOpen{background:var(--panel2);border:1px solid var(--orange);color:var(--text);border-radius:.5rem;
+    padding:.42rem .7rem;font-family:inherit;font-size:.9rem;font-weight:600;cursor:pointer;max-width:15rem}
   .sw-sub{display:none} .sw-sub.active{display:block;animation:fade .18s ease}
   /* compare diff */
   .cmp-banner{background:rgba(255,123,0,.1);border:1px solid var(--orange);color:var(--gold);
@@ -513,21 +518,28 @@
       </section>
       <section class="view" id="view-ship">
         <div class="sw-head">
-          <h2 style="margin:0">Shipwright</h2>
+          <div class="sw-headline">
+            <div class="sw-eyebrow" style="margin:0">Shipwright · viewing</div>
+            <div class="sw-active" id="swBuildChip">No build open</div>
+          </div>
+          <select id="swOpen" title="Open a preset or one of your saved builds">
+            <option value="">＋ Open build…</option>
+            <optgroup label="Presets" id="swOpenPresets"></optgroup>
+            <optgroup label="Your saved builds" id="swOpenSaved"></optgroup>
+          </select>
+          <span style="flex:1"></span>
           <div class="sw-subtabs">
             <button class="sw-subtab active" data-sub="compare">Compare</button>
             <button class="sw-subtab" data-sub="edit">Edit</button>
             <button class="sw-subtab" data-sub="done">Get it done</button>
           </div>
-          <span style="flex:1"></span>
-          <span class="sw-buildchip" id="swBuildChip">No build open</span>
         </div>
 
         <!-- ============ COMPARE (hero) ============ -->
         <div class="sw-sub active" id="sub-compare">
           <div class="recon-sum" id="swCmpSummary"></div>
           <div id="swCmpBanner"></div>
-          <div id="swCompare"><div class="muted" style="padding:1rem">Load or start a build (in <b>Edit</b>) to compare it against your ship.</div></div>
+          <div id="swCompare"><div class="muted" style="padding:1rem">Pick a build from <b>＋ Open build</b> up top (or make one in <b>Edit</b>) to compare it against your ship.</div></div>
         </div>
 
         <!-- ============ EDIT ============ -->
@@ -537,12 +549,10 @@
           <div class="sw-shipname" id="swBuildTitle" style="font-size:1.05rem">No build open</div>
           <div class="recon-sum" id="swReconSummary"></div>
           <div class="sw-toolbar" style="margin-top:.6rem">
-            <select id="swSaved" title="saved builds"><option value="">— saved builds —</option></select>
-            <button class="btn ghost" id="swLoad" style="padding:.4rem .7rem">Load</button>
-            <button class="btn" id="swSave" style="padding:.4rem .8rem">Save</button>
-            <button class="btn ghost" id="swDelete" style="padding:.4rem .7rem">Delete</button>
+            <span class="muted" style="font-size:.78rem">Open builds from the <b>＋ Open build</b> menu up top.</span>
             <span style="flex:1"></span>
-            <select id="swPresetSel" title="load a bundled build"><option value="">— presets —</option></select>
+            <button class="btn" id="swSave" style="padding:.4rem .8rem">Save</button>
+            <button class="btn ghost" id="swDelete" style="padding:.4rem .7rem">Delete saved</button>
             <button class="btn ghost" id="swImportBtn" style="padding:.4rem .7rem">Import</button>
             <button class="btn ghost" id="swExport" style="padding:.4rem .7rem">Export file</button>
           </div>
@@ -1263,15 +1273,9 @@ function blankBuild(ship){ return {schema:'eliteops.shipbuild/1',name:$('swBuild
 async function loadPresetList(){
   try{
     const list = await jget('/api/presets');
-    $('swPresetSel').innerHTML = '<option value="">— presets —</option>' +
-      list.map(p=>`<option value="${esc(p.slug)}">${esc(p.name)}</option>`).join('');
+    $('swOpenPresets').innerHTML = list.map(p=>`<option value="preset:${esc(p.slug)}">${esc(p.name)}</option>`).join('');
   }catch(e){}
 }
-$('swPresetSel').addEventListener('change', async e=>{
-  const slug=e.target.value; if(!slug) return;
-  try{ await applyBuild(await jget('/presets/'+slug+'.json')); }catch(err){ alert('Could not load preset.'); }
-  e.target.value='';
-});
 $('swImportBtn').addEventListener('click', async()=>{
   const ta=$('swImport');
   if(ta.style.display!=='block'){ ta.style.display='block'; ta.focus(); return; }
@@ -1322,11 +1326,25 @@ async function shipwrightTick(){
 }
 
 /* ---- shipwright: sub-tabs + slot-by-slot compare ---- */
-document.querySelectorAll('.sw-subtab').forEach(t=>t.addEventListener('click',()=>{
-  document.querySelectorAll('.sw-subtab').forEach(x=>x.classList.toggle('active',x===t));
-  const s=t.dataset.sub;
-  document.querySelectorAll('.sw-sub').forEach(v=>v.classList.toggle('active', v.id==='sub-'+s));
-}));
+function showSub(name){
+  document.querySelectorAll('.sw-subtab').forEach(x=>x.classList.toggle('active', x.dataset.sub===name));
+  document.querySelectorAll('.sw-sub').forEach(v=>v.classList.toggle('active', v.id==='sub-'+name));
+}
+document.querySelectorAll('.sw-subtab').forEach(t=>t.addEventListener('click',()=>showSub(t.dataset.sub)));
+// Unified "Open build" picker in the header — works from any sub-tab, then jumps to Compare.
+$('swOpen').addEventListener('change', async e=>{
+  const v=e.target.value; e.target.value='';
+  if(!v) return;
+  const i=v.indexOf(':'), kind=v.slice(0,i), slug=v.slice(i+1);
+  try{
+    if(kind==='preset'){ await applyBuild(await jget('/presets/'+slug+'.json')); }
+    else if(kind==='saved'){
+      const r=await fetch('/api/shipwright/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})});
+      if(r.ok) await swRefresh(await r.json());
+    }
+    showSub('compare');   // land on the comparison after opening a build
+  }catch(err){ alert('Could not open that build.'); }
+});
 const CMP_META = {
   'match':{i:'✓',t:'you already have this'},
   'needs-engineering':{i:'⚙',t:'fitted — still needs this engineering'},
@@ -1441,16 +1459,14 @@ $('swAcqBtn').addEventListener('click', async()=>{
 
 let _lastSavedSig=null;
 function renderSaved(list){
-  const s=$('swSaved');
   const sig = list.map(b=>b.slug+':'+b.name+':'+b.modules).join('|');
-  // Don't rebuild (and slam shut) the dropdown on every tick if nothing changed,
-  // or while the user has it open/focused.
-  if(sig===_lastSavedSig || document.activeElement===s) return;
+  // Don't rebuild the picker on every tick if nothing changed, or while it's open.
+  if(sig===_lastSavedSig || document.activeElement===$('swOpen')) return;
   _lastSavedSig = sig;
-  const cur=s.value;
-  s.innerHTML = '<option value="">— saved builds —</option>' +
-    list.map(b=>`<option value="${esc(b.slug)}">${esc(b.name)} (${b.modules})</option>`).join('');
-  if(list.some(b=>b.slug===cur)) s.value=cur;
+  const grp=$('swOpenSaved');
+  grp.innerHTML = list.length
+    ? list.map(b=>`<option value="saved:${esc(b.slug)}">${esc(b.name)} (${b.modules})</option>`).join('')
+    : '<option disabled>— none saved yet —</option>';
 }
 
 let _swMp = null;  // last material plan, so the hide-ready toggle can re-render
@@ -1484,18 +1500,16 @@ $('swSave').addEventListener('click', async()=>{
   if(!sw.build){ alert('Nothing to save — start a build first.'); return; }
   const name = $('swBuildName').value || sw.build.name || 'Build';
   const r = await (await fetch('/api/shipwright/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})})).json();
-  renderSaved(r.saved_builds||[]); if(r.saved) $('swSaved').value=r.saved.slug;
-});
-$('swLoad').addEventListener('click', async()=>{
-  const slug=$('swSaved').value; if(!slug) return;
-  const r=await fetch('/api/shipwright/load',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})});
-  if(r.ok) await swRefresh(await r.json());
+  _lastSavedSig=null; renderSaved(r.saved_builds||[]);   // force the picker to refresh
 });
 $('swDelete').addEventListener('click', async()=>{
-  const slug=$('swSaved').value; if(!slug) return;
-  if(!confirm('Delete saved build "'+$('swSaved').selectedOptions[0].text+'"?')) return;
-  const snap=await (await fetch('/api/shipwright/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug})})).json();
-  renderSaved(snap.saved_builds||[]);
+  if(!sw.build){ return; }
+  const saved=(sw.snap&&sw.snap.saved_builds)||[];
+  const match=saved.find(b=>b.name===sw.build.name);
+  if(!match){ alert('This build isn’t saved yet — nothing to delete. (Save it first, or use Delete on a saved build.)'); return; }
+  if(!confirm('Delete saved build "'+match.name+'"?')) return;
+  const snap=await (await fetch('/api/shipwright/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:match.slug})})).json();
+  _lastSavedSig=null; renderSaved(snap.saved_builds||[]);
 });
 
 /* ---- EDD bridge (optional Tier-4 history) ---- */
