@@ -562,8 +562,8 @@ def find_commodity_sources(
         },
         "sort": [{"distance": {"direction": "asc"}}],
         "reference_system": str(reference_system),
-        "size": 50,
-    }
+        "size": 100,  # Spansh's supply filter is unreliable, so we over-fetch and
+    }                 # keep only the actually-in-stock ones ourselves (below).
     data = _jpost("/stations/search", body, timeout=timeout)
     stations = data.get("results") if isinstance(data, dict) else data
     if not isinstance(stations, list):
@@ -582,6 +582,11 @@ def find_commodity_sources(
                 buy_price = entry.get("buy_price") or entry.get("price")
                 supply = entry.get("supply")
                 break
+        # Only surface stations that ACTUALLY have stock. Spansh's index lists every
+        # station that has ever sold it, most at 0 supply — arriving there finds an
+        # empty market. Require supply > 0 so the sources are real.
+        if not isinstance(supply, (int, float)) or supply <= 0:
+            continue
         sources.append(
             {
                 "station": station.get("name"),

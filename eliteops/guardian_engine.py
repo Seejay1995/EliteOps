@@ -271,11 +271,13 @@ class GuardianEngine:
                                                                large_pad_only=False, limit=5)
                 stops = [{"system": s.get("system"), "station": s.get("station"),
                           "distance_ly": s.get("distance_ly"), "distance_ls": s.get("distance_ls"),
-                          "buy_price": s.get("buy_price"), "supply": s.get("supply")}
+                          "buy_price": s.get("buy_price"), "supply": s.get("supply"),
+                          "updated": s.get("market_updated_at")}
                          for s in sources]
                 with self._lock:
-                    self._markets[commodity] = {"status": "ready", "stops": stops, "error": "",
-                                                "reference": ref, "source": "spansh"}
+                    self._markets[commodity] = {
+                        "status": "ready", "stops": stops, "error": "", "reference": ref, "source": "spansh",
+                        "note": None if stops else "No station within range currently has this in stock."}
                 return
             except Exception as exc:  # noqa: BLE001
                 err = exc

@@ -1634,12 +1634,14 @@ function renderMarkets(markets){
   const entries=Object.entries(markets||{}).filter(([,v])=>v.status!=='idle');
   if(!entries.length){ $('gMarkets').innerHTML=''; return; }
   $('gMarkets').innerHTML = entries.map(([name,v])=>{
-    if(v.status==='searching') return `<div class="muted" style="font-size:.8rem">◷ finding markets for ${esc(name)}…</div>`;
+    if(v.status==='searching') return `<div class="muted" style="font-size:.8rem">◷ finding in-stock markets for ${esc(name)}…</div>`;
     if(v.status==='error') return `<div class="muted err" style="font-size:.8rem">⚠ ${esc(name)}: ${esc(v.error)}</div>`;
-    if(!v.stops||!v.stops.length) return `<div class="muted" style="font-size:.8rem">${esc(name)}: no market found nearby.</div>`;
-    return `<div class="sw-eyebrow" style="color:var(--orange)">Buy ${esc(name)}</div>`+v.stops.map(s=>
+    const srcTag = v.source==='edsm' ? ' <span class="muted" style="font-size:.7rem">via EDSM</span>' : '';
+    if(!v.stops||!v.stops.length) return `<div class="muted" style="font-size:.8rem;margin:.3rem 0">`+
+      `<b>${esc(name)}</b>: no station within range currently has it <b>in stock</b>. These Guardian commodities are scarce and supply rotates — recheck later, widen your range, or check a high-population <b>Industrial/Refinery</b> system.</div>`;
+    return `<div class="sw-eyebrow" style="color:var(--orange)">Buy ${esc(name)} <span class="muted" style="font-size:.7rem">(in stock)</span>${srcTag}</div>`+v.stops.map(s=>
       `<div class="sys-body" style="cursor:default;padding:.3rem .2rem"><span class="bn">${esc(s.station)} <small>/ ${esc(s.system)}</small></span>`+
-      `<span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''} · ${s.buy_price!=null?s.buy_price+' cr':''} · sup ${s.supply||'?'}</span>`+
+      `<span class="bd">${s.distance_ly!=null?Math.round(s.distance_ly)+' ly':''} · <b style="color:var(--green)">${s.supply!=null?Number(s.supply).toLocaleString()+' in stock':'?'}</b>${s.buy_price!=null?' · '+s.buy_price+' cr':''}${s.updated?' · '+String(s.updated).slice(0,10):''}</span>`+
       `<button class="copybtn" onclick="copySys('${esc(s.system)}')">⧉</button></div>`).join('');
   }).join('');
 }
