@@ -1690,8 +1690,9 @@ async function guardianTick(){
       const rows = mats.map(m=>{
         const sc=m.short>0?'var(--gold)':'var(--green)';
         const mkt = m.commodity?`<button class="skipbtn" onclick="gFindMarket('${esc(m.name)}')">⌘ market</button>`:'';
+        const econ = (m.commodity && m.producedAt)?` <span class="tchip" style="font-size:.66rem;padding:.05rem .35rem" title="Produced at ${esc(m.producedAt)}-economy stations — look in a high-population ${esc(m.producedAt)} system">🏭 ${esc(m.producedAt)}</span>`:'';
         const det = src==='Farm'?`<div class="muted" style="font-size:.72rem;padding-left:.1rem">${esc(m.how)}</div>`:'';
-        return `<div class="sw-mod"><span class="mn">${esc(m.name)}</span><span class="bd">need ${m.needed} · have ${m.owned} · <b style="color:${sc}">${m.short?('short '+m.short):'ready ✓'}</b></span>${mkt}</div>${det}`;
+        return `<div class="sw-mod"><span class="mn">${esc(m.name)}${econ}</span><span class="bd">need ${m.needed} · have ${m.owned} · <b style="color:${sc}">${m.short?('short '+m.short):'ready ✓'}</b></span>${mkt}</div>${det}`;
       }).join('');
       const findAll = src==='Buy' ? `<button class="btn" style="padding:.25rem .6rem;font-size:.76rem;margin-left:.5rem" onclick="gFindAllMarkets()">🛒 Find all sources near me</button>` : '';
       return `<div class="card" style="background:var(--panel2);margin-bottom:.6rem"><div class="sw-eyebrow" style="color:${col};font-size:.85rem">${SRCHEAD[src]}${findAll}</div>`+

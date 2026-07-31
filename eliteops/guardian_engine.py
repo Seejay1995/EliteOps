@@ -71,6 +71,22 @@ def _how(source: str, category: str) -> str:
     return _HOW_SOURCE.get(source, "")
 
 
+# The 'Buy' commodities for Guardian module unlocks are industrial components
+# (Machinery-family goods). They're produced at Industrial-economy stations, so
+# a high-population Industrial system is where you'll actually find them stocked.
+_COMMODITY_ECONOMY = {
+    "hn shock mount": "Industrial",
+    "reinforced mounting plate": "Industrial",
+    "hardware diagnostic sensor": "Industrial",
+    "heatsink interlink": "Industrial",
+    "energy grid assembly": "Industrial",
+}
+
+
+def _produced_at(name: str) -> str:
+    return _COMMODITY_ECONOMY.get(str(name or "").lower(), "Industrial")
+
+
 # curated, community-stable farming hotspots (system is what matters for travel)
 GUARDIAN_SITES = [
     {"system": "Synuefe EU-Q c21-10", "type": "Structure",
@@ -339,6 +355,7 @@ class GuardianEngine:
                 total_short += short
                 materials.append({"name": slot["name"], "category": slot["category"],
                                   "source": slot["source"], "commodity": slot["commodity"],
+                                  "producedAt": _produced_at(slot["name"]) if slot["commodity"] else None,
                                   "how": _how(slot["source"], slot["category"]),
                                   "needed": slot["needed"], "owned": owned, "short": short,
                                   "usedBy": sorted(slot["usedBy"])})
