@@ -274,13 +274,31 @@ class GuardianEngine:
                           "buy_price": s.get("buy_price"), "supply": s.get("supply")}
                          for s in sources]
                 with self._lock:
-                    self._markets[commodity] = {"status": "ready", "stops": stops, "error": "", "reference": ref}
+                    self._markets[commodity] = {"status": "ready", "stops": stops, "error": "",
+                                                "reference": ref, "source": "spansh"}
                 return
             except Exception as exc:  # noqa: BLE001
                 err = exc
                 time.sleep(2 * (attempt + 1))
-        with self._lock:
-            self._markets[commodity] = {"status": "error", "stops": [], "error": str(err)}
+
+        # FALLBACK: Spansh is down — read EDSM market snapshots (crowd-sourced, may be stale).
+        try:
+            from . import edsm_traders
+            srcs = edsm_traders.nearest_commodity_sources(ref, commodity, limit=5)
+            stops = [{"system": s.get("system"), "station": s.get("station"),
+                      "distance_ly": s.get("distance_ly"), "distance_ls": s.get("distance_ls"),
+                      "buy_price": s.get("buy_price"), "supply": s.get("supply")}
+                     for s in srcs]
+            with self._lock:
+                self._markets[commodity] = {
+                    "status": "ready" if stops else "error",
+                    "stops": stops, "reference": ref, "source": "edsm",
+                    "error": "" if stops else "Spansh is down and EDSM had no fresh market data for this commodity nearby.",
+                    "note": "Spansh unavailable — from EDSM market snapshots (may be stale/incomplete)."}
+        except Exception as exc2:  # noqa: BLE001
+            with self._lock:
+                self._markets[commodity] = {"status": "error", "stops": [],
+                                            "error": f"Spansh: {err}; EDSM: {exc2}"}
 
     # --- snapshot -----------------------------------------------------------
     def snapshot(self) -> dict:

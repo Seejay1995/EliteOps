@@ -22,6 +22,7 @@ from typing import Any
 _UA = "EliteOps/1.0 (+material finder fallback)"
 _SPHERE = "https://www.edsm.net/api-v1/sphere-systems"
 _STATIONS = "https://www.edsm.net/api-system-v1/stations"
+_MARKET = "https://www.edsm.net/api-system-v1/stations/market"
 
 # EDCD rule: a Material Trader's TYPE follows the station economy (secondary overrides primary).
 _MAT_RULE = {"High Tech": "encoded", "Military": "encoded",
@@ -102,6 +103,73 @@ def _row(sysrec: dict, st: dict) -> dict:
             "distance_ly": sysrec.get("distance"), "distance_ls": st.get("distanceToArrival"),
             "economy": st.get("economy") or info.get("economy"),
             "allegiance": info.get("allegiance")}
+
+
+def nearest_commodity_sources(reference: str, commodity: str, *, radius: float = 45,
+                              system_budget: int = 18, station_budget: int = 28,
+                              limit: int = 5, timeout: float = 15) -> list[dict]:
+    """Stations that SELL `commodity` near `reference`, from EDSM market snapshots.
+
+    EDSM has no 'who sells X' search, so we enumerate the nearest populated
+    systems' stations, then read each station's market and keep the ones actually
+    stocking the commodity. Bounded (nearest ~28 stations with a market) so it
+    stays responsive. Fallback for when Spansh's commodity search is down —
+    EDSM's market data is crowd-sourced and can be stale/incomplete.
+    """
+    ref = (reference or "").strip()
+    if not ref:
+        raise ValueError("no reference system")
+    key = str(commodity).casefold()
+    cache_key = ("commodity", ref.lower(), key)
+    now = time.time()
+    with _LOCK:
+        hit = _CACHE.get(cache_key)
+        if hit and now - hit[0] < _CACHE_TTL:
+            return hit[1]
+
+    systems = _populated_nearby(ref, radius, timeout)[:system_budget]
+
+    def fetch_stations(sysrec):
+        try:
+            d = _get(_STATIONS, {"systemName": sysrec["name"]}, timeout)
+        except (urllib.error.URLError, OSError, ValueError):
+            return sysrec, []
+        return sysrec, (d.get("stations") or [])
+
+    pairs: list[tuple[dict, dict]] = []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for sysrec, stations in pool.map(fetch_stations, systems):
+            for st in stations:
+                if (st.get("haveMarket") and st.get("marketId")
+                        and "Carrier" not in str(st.get("type") or "")):
+                    pairs.append((sysrec, st))
+    pairs.sort(key=lambda p: (p[0].get("distance") or 1e9, p[1].get("distanceToArrival") or 1e9))
+    pairs = pairs[:station_budget]
+
+    def fetch_market(pair):
+        sysrec, st = pair
+        try:
+            d = _get(_MARKET, {"marketId": st["marketId"]}, timeout)
+        except (urllib.error.URLError, OSError, ValueError):
+            return None
+        for c in d.get("commodities") or []:
+            if str(c.get("name") or "").casefold() == key and (c.get("stock") or 0) > 0:
+                return {"system": sysrec.get("name"), "station": st.get("name"),
+                        "distance_ly": sysrec.get("distance"), "distance_ls": st.get("distanceToArrival"),
+                        "buy_price": c.get("buyPrice"), "supply": c.get("stock"),
+                        "economy": st.get("economy")}
+        return None
+
+    out: list[dict] = []
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for r in pool.map(fetch_market, pairs):
+            if r:
+                out.append(r)
+    out.sort(key=lambda r: (r.get("distance_ly") or 1e9, r.get("distance_ls") or 1e9))
+    out = out[:limit]
+    with _LOCK:
+        _CACHE[cache_key] = (now, out)
+    return out
 
 
 def nearest_material_traders(reference: str, *, radius: float = 40, per_type: int = 3,
