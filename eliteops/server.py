@@ -333,6 +333,10 @@ class EliteOps:
                     app.guardian.find_market(str(body.get("commodity") or ""))
                     self._send(200, json.dumps(app.guardian.snapshot()))
                     return
+                if path == "/api/guardian/markets-all":
+                    app.guardian.find_all_markets()
+                    self._send(200, json.dumps(app.guardian.snapshot()))
+                    return
                 if path == "/api/cargo/goto":
                     app.cargo.goto_stop(int(body.get("index") or 0))
                     self._send(200, json.dumps(app.cargo.snapshot()))

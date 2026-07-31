@@ -11,6 +11,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 from typing import Any
 
 from . import catalog
@@ -234,22 +235,52 @@ class GuardianEngine:
         threading.Thread(target=self._run_market, args=(commodity,),
                          name="eliteops-guardian-market", daemon=True).start()
 
+    def find_all_markets(self) -> None:
+        """Search every 'Buy' commodity needed by the selected unlocks at once
+        (in parallel), so it's one click instead of chasing each commodity."""
+        with self._lock:
+            wanted = set(self._wanted)
+        names: list[str] = []
+        for m in GUARDIAN_MODULES:
+            if m["key"] not in wanted:
+                continue
+            recipe = self._recipe_by_name.get(m["recipe"])
+            for i in (recipe or {}).get("Ingredients", []) or []:
+                if str(i.get("Category") or "") == "Commodity":
+                    nm = i.get("Name")
+                    if nm and nm not in names:
+                        names.append(nm)
+        with self._lock:
+            for nm in names:
+                self._markets[nm] = {"status": "searching", "stops": [], "error": ""}
+        for nm in names:
+            threading.Thread(target=self._run_market, args=(nm,),
+                             name="eliteops-guardian-market", daemon=True).start()
+
     def _run_market(self, commodity: str) -> None:
-        try:
-            ref = self.state.snapshot().get("system")
-            if not ref:
-                raise ValueError("No reference system — jump in-game first.")
-            sources = spansh_client.find_commodity_sources(ref, commodity, 1,
-                                                           large_pad_only=False, limit=5)
-            stops = [{"system": s.get("system"), "station": s.get("station"),
-                      "distance_ly": s.get("distance_ly"), "distance_ls": s.get("distance_ls"),
-                      "buy_price": s.get("buy_price"), "supply": s.get("supply")}
-                     for s in sources]
+        ref = self.state.snapshot().get("system")
+        if not ref:
             with self._lock:
-                self._markets[commodity] = {"status": "ready", "stops": stops, "error": "", "reference": ref}
-        except Exception as exc:  # noqa: BLE001
-            with self._lock:
-                self._markets[commodity] = {"status": "error", "stops": [], "error": str(exc)}
+                self._markets[commodity] = {"status": "error", "stops": [],
+                                            "error": "No reference system — jump in-game first."}
+            return
+        err = None
+        for attempt in range(3):  # Spansh market search is slow and can 502/timeout under load
+            try:
+                sources = spansh_client.find_commodity_sources(ref, commodity, 1,
+                                                               large_pad_only=False, limit=5)
+                stops = [{"system": s.get("system"), "station": s.get("station"),
+                          "distance_ly": s.get("distance_ly"), "distance_ls": s.get("distance_ls"),
+                          "buy_price": s.get("buy_price"), "supply": s.get("supply")}
+                         for s in sources]
+                with self._lock:
+                    self._markets[commodity] = {"status": "ready", "stops": stops, "error": "", "reference": ref}
+                return
+            except Exception as exc:  # noqa: BLE001
+                err = exc
+                time.sleep(2 * (attempt + 1))
+        with self._lock:
+            self._markets[commodity] = {"status": "error", "stops": [], "error": str(err)}
 
     # --- snapshot -----------------------------------------------------------
     def snapshot(self) -> dict:

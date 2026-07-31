@@ -543,39 +543,43 @@ def find_commodity_sources(
     *,
     large_pad_only: bool = True,
     limit: int = 5,
-    timeout: float = 25.0,
+    timeout: float = 45.0,
 ) -> list[dict[str, Any]]:
     """Return stations that SELL ``commodity``, NEAREST to ``reference_system`` first.
 
-    Uses Spansh's ``/api/commodity/buy/{system}/{commodity}/{amount}`` endpoint.
-    That endpoint is NOT distance-sorted (it ranks by a buy-deal heuristic), so we
-    collect the qualifying stations and re-sort by distance ourselves — the whole
-    point for colony hauling is to prefer the fewest-jump source. Each source
-    carries buy price, supply, pad availability and distances.
+    Uses ``/api/stations/search`` with a ``market_buy`` supply filter. (The old
+    GET ``/commodity/buy/{system}/{commodity}/{amount}`` endpoint was removed by
+    Spansh and now hangs on every request — including common goods — which is why
+    the "find market" button silently never returned.) Station search IS
+    distance-sortable, but we still re-sort defensively. Slower (~25-35s) but it
+    actually works. Each source carries buy price, supply, pad and distances.
     """
-    path = (
-        "/commodity/buy/"
-        + urllib.parse.quote(str(reference_system))
-        + "/"
-        + urllib.parse.quote(str(commodity))
-        + "/"
-        + str(int(max(1, amount)))
-    )
-    data = _get(path, timeout=timeout)
+    key = str(commodity).casefold()
+    body = {
+        "filters": {
+            "market_buy": [{"name": str(commodity), "supply": {"value": ["1", "1000000000"]}}],
+            "type": {"value": _ACQUIRE_STATION_TYPES},
+        },
+        "sort": [{"distance": {"direction": "asc"}}],
+        "reference_system": str(reference_system),
+        "size": 50,
+    }
+    data = _jpost("/stations/search", body, timeout=timeout)
     stations = data.get("results") if isinstance(data, dict) else data
     if not isinstance(stations, list):
         return []
-    key = str(commodity).casefold()
     sources: list[dict[str, Any]] = []
     for station in stations:
         if not isinstance(station, dict):
             continue
+        if "Carrier" in str(station.get("type") or ""):
+            continue
         if large_pad_only and not station.get("has_large_pad"):
             continue
         buy_price = supply = None
-        for entry in station.get("market") or []:
-            if str(entry.get("commodity", "")).casefold() == key:
-                buy_price = entry.get("buy_price")
+        for entry in station.get("market_buy") or station.get("market") or []:
+            if str(entry.get("commodity") or entry.get("name") or "").casefold() == key:
+                buy_price = entry.get("buy_price") or entry.get("price")
                 supply = entry.get("supply")
                 break
         sources.append(
@@ -584,15 +588,13 @@ def find_commodity_sources(
                 "system": station.get("system_name"),
                 "distance_ly": station.get("distance"),
                 "distance_ls": station.get("distance_to_arrival"),
-                "large_pads": station.get("large_pads"),
+                "large_pads": station.get("has_large_pad"),
                 "is_planetary": station.get("is_planetary"),
                 "buy_price": buy_price,
                 "supply": supply,
                 "market_updated_at": station.get("market_updated_at"),
             }
         )
-        if len(sources) >= 100:
-            break  # bound the candidate pool; plenty to pick the nearest from
     sources.sort(
         key=lambda s: s["distance_ly"] if isinstance(s.get("distance_ly"), (int, float)) else float("inf")
     )
