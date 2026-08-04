@@ -67,6 +67,17 @@ def star_scan_value(star_type: str, mass: float, first_discoverer: bool) -> int:
     return round(value)
 
 
+def planet_scan_value(planet_class: str, terraformable: bool, mass: float,
+                      first_discoverer: bool) -> int:
+    """Value of just SCANNING a planet (FSS/nav) without DSS-mapping it."""
+    base, terraform, _ = _planetclass_k(planet_class, terraformable)
+    k = base + terraform
+    value = k + k * _Q * (mass ** 0.2)
+    if first_discoverer:
+        value *= 2.6
+    return round(max(value, 1))
+
+
 def planet_claim_value(planet_class: str, terraformable: bool, mass: float,
                        first_discoverer: bool, first_mapper: bool) -> int:
     """Full value earned scanning + mapping this planet, with the given first bonuses."""

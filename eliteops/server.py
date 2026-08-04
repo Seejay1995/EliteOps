@@ -28,6 +28,7 @@ from .expedition_engine import ExpeditionEngine
 from .firsts_engine import FirstsEngine
 from .guardian_engine import GuardianEngine
 from .mining_engine import MiningEngine
+from .data_engine import DataEngine
 from .nav_engine import NavEngine
 from .shipwright_engine import ShipwrightEngine
 from .state import EliteState
@@ -45,7 +46,7 @@ class SessionStore:
     Shipwright build, Guardian picks, cash-in threshold) so a server crash/restart
     doesn't lose your work. Journal-derived state rebuilds from the journal replay."""
 
-    _ENGINES = ("cargo", "exo", "expedition", "shipwright", "guardian", "nav")
+    _ENGINES = ("cargo", "exo", "expedition", "shipwright", "guardian", "nav", "data")
 
     def __init__(self, app: "EliteOps") -> None:
         self.app = app
@@ -100,6 +101,7 @@ class EliteOps:
         self.mining = MiningEngine(self.state)
         self.system = SystemEngine(self.state)
         self.shipwright = ShipwrightEngine(self.state)
+        self.data = DataEngine(self.state, self.exo)
         self.edd = EddBridge()
         self.store = SessionStore(self)
         self._stop = threading.Event()
@@ -168,6 +170,9 @@ class EliteOps:
                     return
                 if path == "/api/firsts":
                     self._send(200, json.dumps(app.firsts.snapshot()))
+                    return
+                if path == "/api/data":
+                    self._send(200, json.dumps(app.data.snapshot()))
                     return
                 if path == "/api/nav":
                     self._send(200, json.dumps(app.nav.snapshot()))

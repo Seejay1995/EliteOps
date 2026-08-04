@@ -137,6 +137,17 @@ class ExoEngine:
             if _norm(sp["species"]) == n or _norm(sp["species"]) in n or n in _norm(sp["species"]):
                 sp["new"] = True
 
+    # --- held bio (for the Data wallet tab) ---------------------------------
+    def held_bio(self) -> dict:
+        """Unsold genomic data you're carrying: total value + per-species list."""
+        with self._lock:
+            unsold = [sp for sp in self._species.values() if sp["complete"] and not sp.get("sold")]
+            species = sorted(({"genus": sp["genus"], "species": sp["species"],
+                               "value": self._species_value(sp), "new": bool(sp.get("new"))}
+                              for sp in unsold), key=lambda x: -(x["value"] or 0))
+            return {"value": sum(self._species_value(sp) for sp in unsold),
+                    "count": len(unsold), "sold_value": self._sold_value, "species": species}
+
     # --- value helpers ------------------------------------------------------
     def _species_value(self, sp: dict) -> int:
         base = sp.get("value") or 0

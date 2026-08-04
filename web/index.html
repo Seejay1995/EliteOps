@@ -404,6 +404,7 @@
       <div class="tab" data-view="cg"><span class="i">🏆</span><span>Goals</span></div>
       <div class="tab" data-view="colony"><span class="i">🏗️</span><span>Colony</span></div>
       <div class="tab" data-view="firsts"><span class="i">★</span><span>Firsts</span></div>
+      <div class="tab" data-view="data"><span class="i">💾</span><span>Data</span></div>
     </nav>
     <main>
       <section class="view active" id="view-route">
@@ -815,6 +816,39 @@
             <span class="d" style="background:var(--green)"></span>bio~first (undiscovered system)
           </div>
         </div>
+      </section>
+      <section class="view" id="view-data">
+        <h2>Data Wallet <small class="muted" style="font-size:.8rem">— unsold exploration data you're carrying</small></h2>
+        <div class="hud" style="margin-bottom:.8rem">
+          <div class="card">
+            <div class="hud-lbl">🌌 Cartographics held</div>
+            <div class="hud-big" id="dCartoVal">–</div>
+            <div class="hud-sub" id="dCartoSub"></div>
+          </div>
+          <div class="card">
+            <div class="hud-lbl">🧬 Genomic held</div>
+            <div class="hud-big" id="dBioVal">–</div>
+            <div class="hud-sub" id="dBioSub"></div>
+          </div>
+          <div class="card" style="border-color:var(--orange)">
+            <div class="hud-lbl">💀 At risk if you rebuy</div>
+            <div class="hud-big" id="dRiskVal" style="color:var(--orange)">–</div>
+            <div class="hud-sub" id="dRiskSub"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-bottom:.8rem">
+          <div class="hud-lbl">Top unsold bodies (cartographics)</div>
+          <div class="tblwrap"><table class="firsts" id="dTopTable">
+            <thead><tr><th>Body</th><th>System</th><th>Type</th><th>Firsts</th><th class="r">Est. value</th></tr></thead>
+            <tbody id="dTopRows"><tr><td colspan="5" class="muted">Nothing scanned yet this session — honk + map some bodies.</td></tr></tbody>
+          </table></div>
+        </div>
+        <div class="card" style="margin-bottom:.8rem">
+          <div class="hud-lbl">Genomic samples held</div>
+          <div id="dBioRows"><span class="muted" style="font-size:.85rem">No unsold bio samples — analyse organics with the Composition Scanner.</span></div>
+        </div>
+        <div class="tally"><span class="tchip">Sold this session · carto <b id="dSoldCarto">0</b></span><span class="tchip">Sold this session · bio <b id="dSoldBio">0</b></span></div>
+        <div class="muted" style="font-size:.72rem;margin-top:.5rem"><i>Cartographic credits are an <b>estimate</b> (community value formula) and count only data scanned while EliteOps is running; genomic value is exact. Sell cartographics at <b>Universal Cartographics</b>, bio at <b>Vista Genomics</b>.</i></div>
       </section>
     </main>
   </div>
@@ -2219,6 +2253,28 @@ setRouteMode('trade'); expTick(); setInterval(expTick, 2000);
 cgTick(); setInterval(cgTick, 10000);
 colonyTick(); setInterval(colonyTick, 4000);
 firstsTick(); setInterval(firstsTick, 1500);
+async function dataTick(){
+  let d; try{ d=await jget('/api/data'); }catch(e){ return; }
+  const c=d.cartographic||{}, b=d.bio||{};
+  $('dCartoVal').textContent = cr(c.held||0)+' cr';
+  $('dCartoSub').textContent = `${c.bodies||0} bodies · ${c.systems||0} systems · ${c.first_discoveries||0} first-disc · ${c.first_maps||0} first-map`;
+  $('dBioVal').textContent = cr(b.value||0)+' cr';
+  $('dBioSub').textContent = `${b.count||0} species held`;
+  $('dRiskVal').textContent = cr(d.at_risk||0)+' cr';
+  $('dRiskSub').textContent = 'lost on rebuy before you sell';
+  $('dSoldCarto').textContent = cr(c.sold_value||0);
+  $('dSoldBio').textContent = cr(b.sold_value||0);
+  const top=c.top||[];
+  $('dTopRows').innerHTML = top.length ? top.map(t=>{
+    const f=[t.first_disc?'<span class="bdg DISCOVERY">DISC</span>':'', t.first_map?'<span class="bdg MAP">MAP</span>':''].filter(Boolean).join('')||'<span class="muted">–</span>';
+    return `<tr><td>${esc(t.name)}</td><td class="muted">${esc(t.system)}</td><td>${esc(t.kind)}${t.mapped?' <span class="muted">·mapped</span>':''}</td><td>${f}</td><td class="r">${cr(t.value)}</td></tr>`;
+  }).join('') : '<tr><td colspan="5" class="muted">Nothing scanned yet this session — honk + map some bodies.</td></tr>';
+  const sp=b.species||[];
+  $('dBioRows').innerHTML = sp.length ? sp.map(s=>
+    `<div class="sw-mod"><span class="mn">${esc(s.genus)} ${esc(s.species)}${s.new?' <span class="bdg DISCOVERY">NEW ×5</span>':''}</span><span class="bd">${cr(s.value)} cr</span></div>`).join('')
+    : '<span class="muted" style="font-size:.85rem">No unsold bio samples — analyse organics with the Composition Scanner.</span>';
+}
+dataTick(); setInterval(dataTick, 2000);
 navTick(); setInterval(navTick, 1500);
 systemTick(); setInterval(systemTick, 1500);
 miningTick(); setInterval(miningTick, 1500);
